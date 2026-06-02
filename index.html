@@ -1,650 +1,140 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>404 PUNKS - Firebase Edition</title>
+  <title>404 PUNKS | Genesis Mint + Match System</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* আপনার পুরনো সব স্টাইল এখানে রাখুন (যেমন আগে ছিল) */
-    :root {
-      --neon: #7c3aed;
-      --neon2: #a855f7;
-      --neon3: #ec4899;
-      --neon-glow: rgba(124,58,237,0.45);
-      --neon2-glow: rgba(168,85,247,0.3);
-      --pink-glow: rgba(236,72,153,0.3);
-      --bg0: #05050f;
-      --bg1: #0a0a1a;
-      --bg2: #0f0f24;
-      --bg3: #141428;
-      --surface: #12122a;
-      --surface2: #1a1a38;
-      --border: rgba(124,58,237,0.18);
-      --border2: rgba(124,58,237,0.35);
-      --text: #e2e0ff;
-      --muted: #7070a0;
-      --highlight: #c4b5fd;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Inter', sans-serif;
-      background: var(--bg0);
-      color: var(--text);
-      overflow-x: hidden;
+      background: linear-gradient(135deg, #b8e1fc 0%, #e0f2fe 50%, #bae6fd 100%);
+      min-height: 100vh;
+      color: #0f172a;
     }
-    .font-orb { font-family: 'Orbitron', monospace; }
-    .font-raj { font-family: 'Rajdhani', sans-serif; }
-
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
-      background-size: 48px 48px;
-      pointer-events: none;
-      z-index: 0;
+    /* glass morphism for cards */
+    .glass-card, .section-card, .nft-card, .modal-content {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
     }
-    body::after {
-      content: '';
-      position: fixed;
-      top: -30%;
-      left: -20%;
-      width: 80vw;
-      height: 80vw;
-      background: radial-gradient(circle, rgba(124,58,237,0.07) 0%, transparent 65%);
-      pointer-events: none;
-      z-index: 0;
-    }
-    #app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
-
-    header {
-      padding: 14px 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: rgba(5,5,15,0.85);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border2);
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    .logo-text {
-      font-family: 'Orbitron', monospace;
-      font-size: 20px;
-      font-weight: 900;
-      background: linear-gradient(135deg, #a78bfa, #ec4899, #7c3aed);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      letter-spacing: 2px;
-      filter: drop-shadow(0 0 18px rgba(168,85,247,0.5));
-    }
-    .logo-pulse {
-      display: inline-block;
-      width: 8px; height: 8px;
-      background: #a855f7;
-      border-radius: 50%;
-      margin-right: 10px;
-      box-shadow: 0 0 0 0 rgba(168,85,247,0.7);
-      animation: pulse-ring 2s ease infinite;
-    }
-    @keyframes pulse-ring {
-      0%   { box-shadow: 0 0 0 0 rgba(168,85,247,0.7); }
-      70%  { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
-      100% { box-shadow: 0 0 0 0 rgba(168,85,247,0); }
-    }
-    .edition-badge {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 3px;
-      color: var(--muted);
-      text-transform: uppercase;
-      border: 1px solid rgba(124,58,237,0.25);
-      padding: 4px 10px;
-      border-radius: 4px;
-    }
-    .sync-status {
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 10px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      background: rgba(16,185,129,0.2);
-      color: #34d399;
-      border: 1px solid rgba(16,185,129,0.3);
-    }
-
-    .tabs-bar {
-      display: flex;
-      padding: 12px 16px;
-      gap: 8px;
-      background: rgba(5,5,15,0.7);
-      border-bottom: 1px solid var(--border);
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .tabs-bar::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 18px;
-      border-radius: 6px;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 1px;
+    .layer-item {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(4px);
+      border-radius: 16px;
+      border: 1px solid #93c5fd;
+      transition: all 0.2s;
       cursor: pointer;
-      border: 1px solid transparent;
-      white-space: nowrap;
-      transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-      text-transform: uppercase;
-      background: transparent;
-      color: var(--muted);
-      position: relative;
     }
-    .tab-btn::after {
-      content: '';
-      position: absolute;
-      bottom: -13px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 2px;
-      background: var(--neon2);
-      transition: width 0.3s ease;
-      border-radius: 2px;
+    .layer-item.selected {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.2);
+      box-shadow: 0 0 0 2px #3b82f6;
+    }
+    .tab-btn {
+      transition: all 0.2s;
+      border-radius: 40px;
+      padding: 8px 20px;
+      font-weight: 700;
     }
     .tab-btn.active {
-      color: #fff;
-      border-color: var(--border2);
-      background: rgba(124,58,237,0.15);
-      box-shadow: 0 0 20px rgba(124,58,237,0.2), inset 0 0 20px rgba(124,58,237,0.05);
-    }
-    .tab-btn.active::after { width: 60%; }
-    .tab-btn:hover:not(.active) {
-      color: var(--highlight);
-      background: rgba(124,58,237,0.08);
-    }
-    .tab-icon-img { width: 16px; height: 16px; object-fit: contain; filter: brightness(0) invert(0.5); transition: filter 0.2s; }
-    .tab-btn.active .tab-icon-img { filter: brightness(0) invert(1) sepia(1) saturate(3) hue-rotate(220deg); }
-
-    .panel { flex: 1; padding: 20px 16px; overflow: auto; }
-    @media(min-width:640px){ .panel { padding: 24px 24px; } }
-
-    .glass-card {
-      background: rgba(18,18,42,0.7);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      backdrop-filter: blur(12px);
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-    .glass-card:hover { border-color: var(--border2); }
-
-    .section-card {
-      background: rgba(15,15,35,0.8);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      transition: all 0.25s ease;
-    }
-    .section-card:hover { border-color: rgba(124,58,237,0.3); }
-    .section-card.bg-badge { border-left: 2px solid #10b981; }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.2s;
-    }
-    .section-header:hover { background: rgba(124,58,237,0.08); }
-
-    .section-badge {
-      font-family: 'Rajdhani', monospace;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
-    .badge-acc { background: rgba(124,58,237,0.2); color: #a78bfa; border: 1px solid rgba(124,58,237,0.3); }
-    .badge-base { background: rgba(234,179,8,0.15); color: #fbbf24; border: 1px solid rgba(234,179,8,0.3); }
-    .badge-bg { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
-
-    .layer-item {
-      border-radius: 8px;
-      border: 1px solid rgba(124,58,237,0.15);
-      cursor: pointer;
-      padding: 8px;
-      position: relative;
-      overflow: hidden;
-    }
-    .male-bg { background: rgba(37,99,235,0.08); }
-    .female-bg { background: rgba(236,72,153,0.08); }
-    .gender-icon {
-      position: absolute; top: 6px; right: 6px;
-      width: 18px; height: 18px;
-      border-radius: 50%;
-      border: 1px solid rgba(124,58,237,0.3);
-      background: rgba(5,5,15,0.8);
-      padding: 2px;
-    }
-    .order-number {
-      position: absolute; top: -6px; left: -6px;
-      background: linear-gradient(135deg, #7c3aed, #a855f7);
+      background: #1e40af;
       color: white;
-      border-radius: 50%;
-      width: 20px; height: 20px;
-      font-size: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700;
-      font-family: 'Orbitron', monospace;
-      box-shadow: 0 0 12px rgba(124,58,237,0.5);
-      z-index: 2;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-
-    .nft-input {
-      width: 100%;
-      background: rgba(5,5,15,0.8);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 14px;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      outline: none;
+    .btn-primary, .btn-generate {
+      background: linear-gradient(135deg, #2563eb, #1e3a8a);
+      border: none;
+      transition: 0.2s;
     }
-    .nft-input::placeholder { color: rgba(112,112,160,0.6); }
-    .nft-input:focus { border-color: var(--neon2); box-shadow: 0 0 0 3px rgba(168,85,247,0.1); }
-    select.nft-input option { background: #0a0a1a; color: var(--text); }
-
-    .btn-primary {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      cursor: pointer;
-      border: 1px solid rgba(168,85,247,0.4);
-      background: linear-gradient(135deg, rgba(124,58,237,0.8), rgba(168,85,247,0.6));
-      color: #fff;
-      transition: all 0.2s ease;
-      position: relative;
-      overflow: hidden;
+    .btn-primary:hover, .btn-generate:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(37,99,235,0.3);
     }
-    .btn-primary::before {
-      content: '';
-      position: absolute;
-      top: 0; left: -100%;
-      width: 100%; height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-      transition: left 0.4s ease;
-    }
-    .btn-primary:hover { box-shadow: 0 0 30px rgba(168,85,247,0.5), 0 0 60px rgba(124,58,237,0.2); transform: translateY(-1px); }
-    .btn-primary:hover::before { left: 100%; }
-    .btn-primary:active { transform: scale(0.97) translateY(0); }
-
-    .btn-generate {
-      display: flex; align-items: center; justify-content: center; gap: 10px;
-      width: 100%;
-      padding: 15px 24px;
-      border-radius: 8px;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 16px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      border: 1px solid rgba(168,85,247,0.5);
-      background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #ec4899 100%);
-      color: #fff;
-      transition: all 0.25s ease;
-      position: relative;
-      overflow: hidden;
-    }
-    .btn-generate::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, #9333ea 0%, #c026d3 50%, #f472b6 100%);
-      opacity: 0;
-      transition: opacity 0.25s;
-    }
-    .btn-generate:hover { box-shadow: 0 0 40px rgba(168,85,247,0.6), 0 0 80px rgba(124,58,237,0.3); transform: translateY(-2px); }
-    .btn-generate:hover::before { opacity: 1; }
-    .btn-generate > * { position: relative; z-index: 1; }
-    .btn-generate:active { transform: scale(0.98); }
-
-    .btn-sm {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      flex: 1;
-      padding: 8px 4px;
-      border-radius: 6px;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: rgba(20,20,40,0.8);
-      color: var(--muted);
-      transition: all 0.2s;
-    }
-    .btn-sm:hover { border-color: var(--border2); color: var(--text); background: rgba(124,58,237,0.15); }
-    .btn-sm:active { transform: scale(0.96); }
-    .btn-danger { background: rgba(127,29,29,0.2); border-color: rgba(239,68,68,0.2); color: rgba(248,113,113,0.7); }
-    .btn-danger:hover { background: rgba(127,29,29,0.5); border-color: rgba(239,68,68,0.5); color: #fca5a5; }
-    .btn-delete { padding: 8px 10px; }
-
-    .nft-card {
-      background: rgba(15,15,35,0.9);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
-      cursor: pointer;
-      position: relative;
-    }
-    .nft-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 12px;
-      background: linear-gradient(135deg, rgba(124,58,237,0.12), rgba(236,72,153,0.06));
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-    }
-    .nft-card:hover { border-color: rgba(168,85,247,0.4); transform: translateY(-4px); box-shadow: 0 16px 40px rgba(124,58,237,0.25), 0 0 0 1px rgba(168,85,247,0.1); }
-    .nft-card:hover::before { opacity: 1; }
-
-    .modal-backdrop {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.88);
-      backdrop-filter: blur(12px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
-      animation: fadeIn 0.2s ease;
-    }
-    .modal-content {
-      max-width: 90vw; width: 520px;
-      background: rgba(10,10,26,0.98);
-      border: 1px solid var(--border2);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 0 80px rgba(124,58,237,0.25), 0 40px 80px rgba(0,0,0,0.7);
-      max-height: 88vh;
-      overflow: auto;
-    }
-    .attribute-badge {
-      background: rgba(20,20,50,0.9);
-      border: 1px solid rgba(124,58,237,0.2);
-      border-left: 2px solid #7c3aed;
-      padding: 8px 14px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .preview-canvas {
-      border: 1px solid var(--border2);
-      border-radius: 10px;
-      background: var(--bg0);
-      box-shadow: 0 0 40px rgba(124,58,237,0.15);
-    }
-
-    .info-strip {
-      background: rgba(124,58,237,0.06);
-      border: 1px solid rgba(124,58,237,0.15);
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .info-strip span { color: var(--highlight); }
-
-    .order-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(124,58,237,0.12);
-      border: 1px solid rgba(124,58,237,0.2);
-      border-radius: 5px;
-      padding: 4px 10px;
-      font-size: 11px;
-      font-family: 'Rajdhani', sans-serif;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-    }
-
-    .section-name { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-    .section-count { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--muted); }
-
-    .accordion-icon { transition: transform 0.25s ease; color: var(--muted); }
-    .rotate-180 { transform: rotate(180deg); }
-
-    #toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: rgba(10,10,26,0.95);
-      border: 1px solid var(--border2);
-      color: var(--highlight);
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      backdrop-filter: blur(20px);
-      box-shadow: 0 0 40px rgba(124,58,237,0.3);
-      z-index: 9999;
-      white-space: nowrap;
-    }
-    #toast.hidden { display: none; }
-
-    .gender-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: nowrap;
-    }
-    .gender-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      padding: 8px 14px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      transition: all 0.2s;
-      font-family: 'Rajdhani', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.8px;
-      color: var(--muted);
-      background: rgba(5,5,15,0.6);
-    }
-    .gender-label:has(input:checked) { border-color: var(--neon2); background: rgba(124,58,237,0.12); color: var(--text); }
-    .gender-label input { width: 0; height: 0; opacity: 0; position: absolute; }
-
-    .empty-state { text-align: center; padding: 64px 0; color: var(--muted); font-family: 'Rajdhani', sans-serif; font-size: 15px; letter-spacing: 1px; }
-
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .fade-in { animation: fadeIn 0.3s ease both; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    .animate-spin { animation: spin 1s linear infinite; }
-
-    .count-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(124,58,237,0.1);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 6px 14px;
-      font-family: 'Orbitron', monospace;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--highlight);
-      margin-bottom: 16px;
-    }
-    .count-dot { width: 6px; height: 6px; border-radius: 50%; background: #a855f7; animation: pulse-ring 2s ease infinite; }
+    .match-badge { background: #22c55e20; color: #15803d; border: 1px solid #22c55e; border-radius: 40px; padding: 4px 12px; font-size: 12px; font-weight: bold; }
+    .nomatch-badge { background: #ef444420; color: #b91c1c; border: 1px solid #ef4444; border-radius: 40px; padding: 4px 12px; font-size: 12px; font-weight: bold; }
+    .attribute-badge { background: #f8fafc; border-left: 4px solid #3b82f6; padding: 8px 12px; border-radius: 12px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .preview-canvas { background: #0f172a; border-radius: 24px; border: 2px solid #3b82f6; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 12px 24px; border-radius: 60px; z-index: 9999; font-weight: bold; backdrop-filter: blur(12px); }
+    .order-tag { background: #e2e8f0; border-radius: 32px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #1e293b; }
+    .hidden { display: none; }
+    .section-header { cursor: pointer; user-select: none; }
+    .nft-input { background: white; border: 1px solid #cbd5e1; border-radius: 16px; padding: 12px 16px; width: 100%; outline: none; transition: 0.2s; }
+    .nft-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px #93c5fd; }
   </style>
 </head>
 <body>
-<div id="app">
-  <header>
-    <div style="display:flex;align-items:center;gap:12px">
-      <span class="logo-pulse"></span>
-      <h1 class="logo-text">404 PUNKS</h1>
+
+<div id="app" class="max-w-7xl mx-auto px-4 py-4">
+  <!-- Header -->
+  <header class="flex justify-between items-center mb-6 bg-white/60 backdrop-blur-md rounded-2xl p-4 shadow-md border border-blue-200">
+    <div class="flex items-center gap-3">
+      <div class="w-3 h-3 bg-blue-600 rounded-full animate-pulse"></div>
+      <h1 class="font-orb text-2xl font-black bg-gradient-to-r from-blue-800 to-indigo-700 bg-clip-text text-transparent">404 PUNKS</h1>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <span id="sync-status" class="sync-status">🌍 Firebase Connected</span>
-      <span class="edition-badge">Global Layer DB</span>
+    <div class="flex gap-3">
+      <span id="sync-status" class="text-xs px-3 py-1 bg-green-100 text-green-800 rounded-full font-bold">🌐 Firebase Live</span>
+      <span class="text-xs px-3 py-1 bg-blue-100 text-blue-800 rounded-full">Match System v2</span>
     </div>
   </header>
 
-  <div class="tabs-bar">
-    <button onclick="App.switchTab('layers')" id="tab-layers" class="tab-btn active">
-      <img src="https://github.com/airdropfdi/airdropfdi.github.io/blob/main/Icon/layers.png?raw=true" class="tab-icon-img" alt="">
-      Layers
-    </button>
-    <button onclick="App.switchTab('create')" id="tab-create" class="tab-btn">
-      <img src="https://github.com/airdropfdi/airdropfdi.github.io/blob/main/Icon/Create.png?raw=true" class="tab-icon-img" alt="">
-      Create NFT
-    </button>
-    <button onclick="App.switchTab('collection')" id="tab-collection" class="tab-btn">
-      <img src="https://github.com/airdropfdi/airdropfdi.github.io/blob/main/Icon/collection.png?raw=true" class="tab-icon-img" alt="">
-      Collection
-    </button>
+  <!-- Tabs -->
+  <div class="flex gap-3 mb-6 flex-wrap">
+    <button onclick="App.switchTab('layers')" id="tab-layers" class="tab-btn px-5 py-2 bg-white/60 font-raj font-bold flex items-center gap-2"><i data-lucide="layers" style="width:16px"></i> Global Layers</button>
+    <button onclick="App.switchTab('create')" id="tab-create" class="tab-btn px-5 py-2 bg-white/60 font-raj font-bold flex items-center gap-2"><i data-lucide="sparkles" style="width:16px"></i> Mint NFT</button>
+    <button onclick="App.switchTab('collection')" id="tab-collection" class="tab-btn px-5 py-2 bg-white/60 font-raj font-bold flex items-center gap-2"><i data-lucide="gallery-horizontal" style="width:16px"></i> My Collection</button>
   </div>
 
-  <div style="flex:1;overflow:auto">
-    <div id="panel-layers" class="panel space-y-4">
-      <div class="glass-card" style="padding:20px">
-        <h3 class="font-raj" style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--highlight);margin-bottom:16px">
-          ➕ Add New Layer to Global Library
-        </h3>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <input type="text" id="github-url" placeholder="GitHub Raw Image URL" class="nft-input">
-          <div style="display:flex;flex-wrap:wrap;gap:12px">
-            <input type="text" id="layer-value" placeholder="Value (e.g., Red Hair, Blue Skin)" class="nft-input" style="flex:1;min-width:180px">
-            <select id="layer-section" class="nft-input" style="flex:1;min-width:160px">
-              <option value="Background">Background (UI)</option>
-              <option value="Base">Base</option>
-              <option value="Nose">Nose</option>
-              <option value="Neck">Neck</option>
-              <option value="Face">Face</option>
-              <option value="Accessory">Accessory</option>
-              <option value="Mouth">Mouth</option>
-              <option value="Ear">Ear</option>
-              <option value="Beard">Beard</option>
-              <option value="Eyes">Eyes</option>
-              <option value="Head">Head</option>
-            </select>
-          </div>
-          <div class="gender-row">
-            <span class="font-raj" style="font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)">Gender (UI only):</span>
-            <label class="gender-label">
-              <input type="radio" name="layer-gender" value="male" checked>
-              <img src="https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/male.png?raw=true" style="width:16px;height:16px" onerror="this.style.display='none'">
-              <span style="color:#60a5fa"> Male</span>
-            </label>
-            <label class="gender-label">
-              <input type="radio" name="layer-gender" value="female">
-              <img src="https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/femenine.png?raw=true" style="width:16px;height:16px" onerror="this.style.display='none'">
-              <span style="color:#f472b6"> Female</span>
-            </label>
-          </div>
-          <button onclick="App.addLayer()" class="btn-primary">
-            <i data-lucide="plus" style="width:16px;height:16px"></i> Add to Global Library
-          </button>
-        </div>
+  <!-- LAYERS PANEL -->
+  <div id="panel-layers" class="space-y-5">
+    <div class="glass-card p-5 rounded-2xl">
+      <h3 class="font-raj font-bold text-blue-900 mb-3">➕ Add New Layer to Global Library (Firebase)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <input type="text" id="github-url" placeholder="GitHub RAW image URL" class="nft-input">
+        <input type="text" id="layer-value" placeholder="Value (e.g., Blue Skin, Mohawk)" class="nft-input">
+        <select id="layer-section" class="nft-input">
+          <option value="Background">Background (UI)</option><option value="Base">Base</option><option value="Head">Head</option>
+          <option value="Eyes">Eyes</option><option value="Mouth">Mouth</option><option value="Accessory">Accessory</option>
+          <option value="Nose">Nose</option><option value="Neck">Neck</option><option value="Face">Face</option><option value="Ear">Ear</option><option value="Beard">Beard</option>
+        </select>
+        <div class="flex gap-3"><label class="flex items-center gap-1"><input type="radio" name="layer-gender" value="male" checked> ♂ Male</label><label class="flex items-center gap-1"><input type="radio" name="layer-gender" value="female"> ♀ Female</label></div>
+        <button onclick="App.addLayer()" class="btn-primary text-white py-2 rounded-xl font-bold">➕ Sync to Firebase</button>
       </div>
-
-      <div class="info-strip" style="display:flex;align-items:center;gap:10px">
-        <img src="https://github.com/airdropfdi/airdropfdi.github.io/blob/main/Icon/drag-and-drop.png?raw=true" style="width:14px;height:14px;" onerror="this.style.display='none'">
-        <span>🌍 <strong>FIREBASE POWERED</strong> — Real-time sync across all users! | Click folder to expand</span>
-      </div>
-
-      <div id="sections-container" class="space-y-3"></div>
-      <p id="layers-empty" class="empty-state">Loading global layers from Firebase...</p>
     </div>
+    <div id="sections-container" class="space-y-4"></div>
+    <div id="layers-empty" class="text-center text-gray-600 py-10 hidden">No global layers yet. Add the first layer!</div>
+  </div>
 
-    <div id="panel-create" class="panel space-y-4 hidden">
-      <div class="info-strip">
-        <div style="display:grid;gap:4px">
-          <span>📌 Click layers to select them · <span>First = Bottom layer</span> · Last = Top layer</span>
-          <span>🏷️ <span>Folder name = trait_type in JSON</span> (Base, Nose, Neck, Face, Accessory, Mouth, Ear, Beard, Eyes, Head)</span>
-          <span>🌄 <span>Background</span> is UI only — will NOT appear in JSON attributes</span>
-          <span>🤝 <span>All layers below are from global library</span> — everyone sees the same options!</span>
-        </div>
-      </div>
+  <!-- CREATE PANEL - Single Mint -->
+  <div id="panel-create" class="space-y-5 hidden">
+    <div class="glass-card p-4 rounded-xl text-sm text-gray-700"><span class="font-bold text-blue-800">⚡ JSON Rules:</span> Only <span class="text-indigo-700 font-bold">"Base"</span> remains as trait_type. All other traits (Head, Eyes, Mouth, Accessory, etc) become <strong>"Accessory"</strong>. Background excluded. <br>🔍 <strong>Auto-match:</strong> Your NFT compares with official index.json (Type + Accessories values). Shows exact match ID or "No match".</div>
+    <div class="glass-card p-5 flex flex-col items-center rounded-2xl"><canvas id="live-preview-canvas" width="240" height="240" class="preview-canvas w-[240px] h-[240px]"></canvas><p class="text-gray-600 text-xs mt-2">Live preview (bottom → top order)</p></div>
+    <div id="create-sections-container" class="space-y-4 max-h-[45vh] overflow-auto pr-1"></div>
+    <div class="glass-card p-4 rounded-xl"><p class="font-raj font-bold text-blue-900 mb-2">Selected layers order</p><div id="order-preview-list" class="flex flex-wrap gap-2"></div></div>
+    <input type="text" id="nft-name" placeholder="NFT Name" value="404 Punks" class="nft-input">
+    <textarea id="nft-description" rows="2" placeholder="Description" class="nft-input">Limited glitch artifact from the 404 dimension.</textarea>
+    <button id="mintButtonSingle" class="btn-generate w-full py-4 text-white rounded-xl font-bold text-lg shadow-lg">✨ Mint NFT (Single)</button>
+  </div>
 
-      <div class="glass-card" style="padding:20px">
-        <h3 class="font-raj" style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--highlight);margin-bottom:14px;display:flex;align-items:center;gap:8px">
-          <i data-lucide="eye" style="width:14px;height:14px"></i> Live Preview
-        </h3>
-        <div style="display:flex;justify-content:center">
-          <canvas id="live-preview-canvas" width="200" height="200" class="preview-canvas" style="width:200px;height:200px"></canvas>
-        </div>
-        <p style="font-family:'Rajdhani',sans-serif;font-size:11px;letter-spacing:1px;color:var(--muted);text-align:center;margin-top:10px;text-transform:uppercase">Preview updates as you select layers</p>
-      </div>
-
-      <div id="create-sections-container" class="space-y-3" style="max-height:40vh;overflow:auto"></div>
-
-      <div class="glass-card" style="padding:14px">
-        <p style="font-family:'Rajdhani',sans-serif;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Selected layers order (bottom → top)</p>
-        <div id="order-preview-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-      </div>
-
-      <input type="text" id="nft-name" value="404 Punks" class="nft-input">
-      <textarea id="nft-description" rows="3" class="nft-input" style="resize:vertical">404 Punks is a rare CryptoPunks inspired collection where each punk is a not found glitch version of the original punk universe lost, unique, and future-valued digital assets</textarea>
-
-      <button onclick="App.createNFT()" id="btn-create-nft" class="btn-generate">
-        <i data-lucide="sparkles" style="width:18px;height:18px"></i> Generate NFT
-      </button>
-    </div>
-
-    <div id="panel-collection" class="panel space-y-4 hidden">
-      <div id="nft-count"></div>
-      <div id="nft-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px"></div>
-      <p id="nft-empty" class="empty-state">No NFTs created yet.</p>
-    </div>
+  <!-- COLLECTION PANEL -->
+  <div id="panel-collection" class="space-y-5 hidden">
+    <div id="nft-count"></div>
+    <div id="nft-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    <div id="nft-empty" class="text-center text-gray-600 py-12">No NFTs minted yet. Go to Mint tab.</div>
   </div>
 
   <div id="toast" class="hidden"></div>
 </div>
 
 <script>
-// ============================================
-// 404 PUNKS - FIREBASE REAL-TIME DATABASE
-// 30-40 users, fully private, perfect for your needs!
-// ============================================
-
-const SECTIONS = ["Background","Base","Nose","Neck","Face","Accessory","Mouth","Ear","Beard","Eyes","Head"];
-
-// 🔥 YOUR FIREBASE CONFIGURATION - REPLACE WITH YOUR OWN!
-// Go to Firebase Console -> Project Settings -> General -> Your apps -> Firebase SDK snippet
-const firebaseConfig = {
+  // ----------------------------- FIREBASE CONFIG -------------------------
+  const firebaseConfig = {
     apiKey: "AIzaSyAOy69Mp1LDbiWE4594ssJvhihKAP89punks-db.firebaseapp.com",
     authDomain: "punks-db.firebaseapp.com",
     databaseURL: "https://punks-db-default-rtdb.firebaseio.com",
@@ -652,558 +142,240 @@ const firebaseConfig = {
     storageBucket: "punks-db.firebasestorage.app",
     messagingSenderId: "935797407482",
     appId: "1:935797407482:web:1b77f90478160ac69c1343"
-};
+  };
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+  const SECTIONS = ["Background","Base","Head","Eyes","Mouth","Accessory","Nose","Neck","Face","Ear","Beard"];
+  let layersBySection = {};
+  let selectedLayers = {};   // { section: {layerId, value, imageUrl, gender} }
+  let nfts = [];
+  let masterIndexMap = [];    // array of { id, traits: [typeValue, accessory1, accessory2, accessory3] }
+  let previewCtx = null;
+  let openSectionCreate = null, openSectionLayers = null;
 
-let layersBySection = {};
-let selectedOrder = [];
-let nfts = [];
-let previewCanvas = null, previewCtx = null;
-let openSectionLayers = null, openSectionCreate = null;
+  for(let s of SECTIONS) layersBySection[s] = [];
 
-// Initialize empty structure
-for(let s of SECTIONS) {
-    layersBySection[s] = [];
-}
+  // Helper
+  function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 3000); }
+  function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
-// Load user's NFTs from localStorage (private collection)
-function loadUserNFTs() {
+  // Load local NFTs
+  function loadUserNFTs() { try { const saved = localStorage.getItem('404punks_mainnet_v2'); if(saved) nfts = JSON.parse(saved); else nfts = []; } catch(e){} }
+  function saveUserNFTs() { localStorage.setItem('404punks_mainnet_v2', JSON.stringify(nfts)); }
+
+  // ---------- MASTER INDEX FETCH & PARSE (official index.json) ----------
+  async function fetchMasterIndex() {
     try {
-        const saved = localStorage.getItem('404punks_my_nfts_firebase');
-        if(saved) nfts = JSON.parse(saved);
-    } catch(e) { console.warn(e); }
-}
-
-function saveUserNFTs() {
-    localStorage.setItem('404punks_my_nfts_firebase', JSON.stringify(nfts));
-}
-
-function showToast(msg) {
-    const toast = document.getElementById('toast');
-    toast.textContent = msg;
-    toast.classList.remove('hidden');
-    clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(()=>toast.classList.add('hidden'), 3500);
-}
-
-function escapeHtml(str) {
-    if(!str) return '';
-    return str.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]||m));
-}
-
-function getSectionBadgeClass(section) {
-    if(section==="Background") return "badge-bg";
-    if(section==="Base") return "badge-base";
-    return "badge-acc";
-}
-
-function getSectionBadgeLabel(section) {
-    if(section==="Background") return "UI Only";
-    if(section==="Base") return "Trait: Base";
-    return "Trait: "+section;
-}
-
-function initPreviewCanvas() {
-    previewCanvas = document.getElementById('live-preview-canvas');
-    if(previewCanvas) previewCtx = previewCanvas.getContext('2d');
-}
-
-async function updateLivePreview() {
-    if(!previewCtx) return;
-    previewCtx.clearRect(0,0,200,200);
-    previewCtx.fillStyle = '#05050f';
-    previewCtx.fillRect(0,0,200,200);
-    if(selectedOrder.length===0) return;
-    for(let item of selectedOrder) {
-        await new Promise(resolve => {
-            const img = new Image(); img.crossOrigin = "Anonymous";
-            img.onload = ()=>{ previewCtx.drawImage(img,0,0,200,200); resolve(); };
-            img.onerror = ()=>resolve();
-            img.src = item.imageUrl;
-        });
-    }
-}
-
-// ========== FIREBASE SYNC FUNCTIONS ==========
-
-// Listen for real-time updates from Firebase
-function listenToFirebaseLayers() {
-    const layersRef = database.ref('layers');
-    
-    layersRef.on('value', (snapshot) => {
-        const data = snapshot.val();
-        if(data) {
-            // Update local layers with Firebase data
-            for(let section of SECTIONS) {
-                if(data[section]) {
-                    layersBySection[section] = data[section];
-                } else {
-                    layersBySection[section] = [];
-                }
-            }
-        } else {
-            // No data in Firebase yet, initialize with empty arrays
-            for(let section of SECTIONS) {
-                layersBySection[section] = [];
-            }
-            // Save initial empty structure to Firebase
-            saveAllLayersToFirebase();
+      const res = await fetch('https://raw.githubusercontent.com/404punkslab/404punkslab.github.io/main/index.json');
+      if(!res.ok) throw new Error('HTTP error');
+      const data = await res.json();
+      // data structure: { "1": { attributes: [...] }, "2": ... }
+      masterIndexMap = [];
+      for(let key in data) {
+        const item = data[key];
+        if(!item.attributes) continue;
+        let typeVal = null;
+        let accessories = [];
+        for(let attr of item.attributes) {
+          if(attr.trait_type === 'Type') typeVal = attr.value;
+          else if(attr.trait_type && attr.trait_type.startsWith('Accessory')) {
+            accessories.push(attr.value);
+          }
         }
-        
-        // Refresh UI
-        renderSections();
-        renderCreateSections();
-        
-        const statusEl = document.getElementById('sync-status');
-        statusEl.textContent = '🌍 Live Sync ON';
-        statusEl.style.background = 'rgba(16,185,129,0.2)';
-        statusEl.style.color = '#34d399';
-        
-        console.log('Firebase sync complete!');
-    }, (error) => {
-        console.error('Firebase read error:', error);
-        const statusEl = document.getElementById('sync-status');
-        statusEl.textContent = '⚠️ Firebase Error';
-        statusEl.style.background = 'rgba(239,68,68,0.2)';
-        statusEl.style.color = '#f87171';
-        showToast('⚠️ Firebase connection issue. Check your config.');
-    });
-}
+        if(typeVal) {
+          const traits = [typeVal, ...accessories.slice(0,3)];  // first 3 accessories
+          masterIndexMap.push({ id: parseInt(key), traits });
+        }
+      }
+      console.log('Master index loaded:', masterIndexMap.length);
+    } catch(e) { console.warn('Failed to load index.json', e); masterIndexMap = []; }
+  }
 
-// Save all layers to Firebase (initial save or after delete)
-async function saveAllLayersToFirebase() {
-    try {
-        await database.ref('layers').set(layersBySection);
-        console.log('All layers saved to Firebase');
-    } catch(error) {
-        console.error('Error saving to Firebase:', error);
-        showToast('Failed to save to Firebase');
+  // Match function: compare generated NFT's Type (Base) + accessory values
+  function matchWithMaster(attributes) {
+    if(!masterIndexMap.length) return { matched: false, matchId: null, reason: 'Master data not loaded' };
+    // Extract "Base" value as Type, and all "Accessory" values (ignore "Attribute Count")
+    let baseValue = null;
+    let accessoryValues = [];
+    for(let a of attributes) {
+      if(a.trait_type === 'Base') baseValue = a.value;
+      else if(a.trait_type === 'Accessory') accessoryValues.push(a.value);
     }
-}
-
-// Add a single layer to a section
-async function addLayerToFirebase(section, layer) {
-    try {
-        const currentLayers = layersBySection[section] || [];
-        currentLayers.push(layer);
-        await database.ref(`layers/${section}`).set(currentLayers);
-        showToast(`✅ "${layer.value}" added to ${section} — SYNCED TO ALL USERS!`);
-    } catch(error) {
-        console.error('Error adding layer:', error);
-        showToast('Failed to add layer');
+    if(!baseValue) return { matched: false, matchId: null, reason: 'No Base trait' };
+    const nftTraits = [baseValue, ...accessoryValues.slice(0,3)];
+    for(let master of masterIndexMap) {
+      if(JSON.stringify(nftTraits) === JSON.stringify(master.traits)) {
+        return { matched: true, matchId: master.id };
+      }
     }
-}
+    return { matched: false, matchId: null };
+  }
 
-// Delete a layer from a section
-async function deleteLayerFromFirebase(section, layerId) {
-    try {
-        const currentLayers = layersBySection[section] || [];
-        const filteredLayers = currentLayers.filter(l => String(l.id) !== String(layerId));
-        await database.ref(`layers/${section}`).set(filteredLayers);
-        showToast('✓ Layer deleted from global library');
-    } catch(error) {
-        console.error('Error deleting layer:', error);
-        showToast('Failed to delete layer');
+  // Build attributes: only Base remains trait_type "Base", all others become "Accessory"
+  function buildAttributes(orderedLayers) {
+    const attrs = [];
+    for(let layer of orderedLayers) {
+      if(layer.section === "Background") continue;
+      const trait_type = (layer.section === "Base") ? "Base" : "Accessory";
+      attrs.push({ trait_type, value: layer.value });
     }
-}
+    attrs.push({ trait_type: "Attribute Count", value: attrs.length.toString() });
+    return attrs;
+  }
 
-// ========== UI FUNCTIONS ==========
-
-async function addLayer() {
-    const urlInput = document.getElementById('github-url');
-    const valueInput = document.getElementById('layer-value');
-    const sectionSelect = document.getElementById('layer-section');
-    const genderRadios = document.getElementsByName('layer-gender');
-    let gender = 'male';
-    for(let r of genderRadios) if(r.checked){ gender=r.value; break; }
-    let imageUrl = urlInput.value.trim();
-    let value = valueInput.value.trim();
-    let section = sectionSelect.value;
-    
-    if(!imageUrl){ showToast('Please enter GitHub image URL'); return; }
-    if(!value){ showToast('Please enter a Value'); return; }
-    
-    if(imageUrl.includes('github.com') && !imageUrl.includes('raw.githubusercontent.com'))
-        imageUrl = imageUrl.replace('github.com','raw.githubusercontent.com').replace('/blob/','/');
-    
-    const newLayer = { 
-        id: Date.now() + '_' + Math.random().toString(36).substr(2, 8), 
-        value, 
-        imageUrl, 
-        gender,
-        createdBy: 'User',
-        createdAt: new Date().toISOString()
-    };
-    
-    // Verify image loads first
-    const img = new Image();
-    img.onload = async () => {
-        await addLayerToFirebase(section, newLayer);
-        urlInput.value = ''; 
-        valueInput.value = '';
-    };
-    img.onerror = () => { showToast('❌ Failed to load image. Check URL'); };
-    img.src = imageUrl;
-}
-
-function deleteLayer(section, layerId) {
-    if(confirm('⚠️ Delete this layer from GLOBAL library? Everyone will lose access.')){
-        deleteLayerFromFirebase(section, layerId);
-        // Remove from selectedOrder if present
-        selectedOrder = selectedOrder.filter(item => String(item.layerId) !== String(layerId));
-        selectedOrder.forEach((item, idx) => { item.order = idx + 1; });
-        updateOrderPreview(); 
-        updateLivePreview();
-    }
-}
-
-function toggleSectionLayers(section) { 
-    openSectionLayers = openSectionLayers === section ? null : section; 
-    renderSections(); 
-}
-
-function toggleSectionCreate(section) { 
-    openSectionCreate = openSectionCreate === section ? null : section; 
-    renderCreateSections(); 
-}
-
-function renderSections() {
-    const container = document.getElementById('sections-container');
-    const empty = document.getElementById('layers-empty');
-    let hasAny = false, html = '';
-    
-    for(let section of SECTIONS){
-        const layers = layersBySection[section] || [];
-        if(layers.length > 0) hasAny = true;
-        const isOpen = openSectionLayers === section;
-        const isBackground = section === "Background";
-        
-        html += `
-            <div class="section-card ${isBackground?'bg-badge':''} fade-in">
-                <div onclick="App.toggleSectionLayers('${section}')" class="section-header">
-                    <div style="display:flex;align-items:center;gap:10px">
-                        <img src="https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/folder.png?raw=true" style="width:18px;height:18px;object-fit:contain" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2218%22 height=%2218%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23a78bfa%22 stroke-width=%222%22%3E%3Cpath d=%22M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z%22/%3E%3C/svg%3E'">
-                        <span class="section-name" style="color:${isBackground?'#34d399':'#c4b5fd'}">${section}</span>
-                        <span class="section-count">${layers.length} layers</span>
-                        <span class="section-badge ${getSectionBadgeClass(section)}">${getSectionBadgeLabel(section)}</span>
-                    </div>
-                    <i data-lucide="chevron-down" style="width:16px;height:16px" class="accordion-icon ${isOpen?'rotate-180':''}"></i>
-                </div>
-                ${isOpen ? `
-                <div class="section-content" style="padding:0 16px 16px;border-top:1px solid var(--border)">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px">
-                        ${layers.map(layer=>`
-                            <div class="layer-item ${layer.gender==='male'?'male-bg':'female-bg'}">
-                                <img src="${layer.gender==='male'?'https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/male.png?raw=true':'https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/femenine.png?raw=true'}" class="gender-icon" onerror="this.style.display='none'">
-                                <div style="aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg0);margin-bottom:8px">
-                                    <img src="${layer.imageUrl}" alt="${escapeHtml(layer.value)}" style="width:100%;height:100%;object-fit:contain" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22%3E%3Crect fill=%22%23111%22 width=%2260%22 height=%2260%22/%3E%3C/svg%3E'">
-                                </div>
-                                <p style="font-size:11px;font-family:'Rajdhani',sans-serif;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)">${escapeHtml(layer.value)}</p>
-                                <p style="font-size:9px;text-align:center;color:${layer.gender==='male'?'#60a5fa':'#f472b6'};margin-top:2px">${layer.gender==='male'?'♂ Male':'♀ Female'}</p>
-                                <button onclick="App.deleteLayer('${section}', '${layer.id}')" class="btn-sm btn-danger" style="width:100%;margin-top:8px;font-size:11px">Delete</button>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>` : ''}
-            </div>`;
-    }
-    
-    empty.classList.toggle('hidden', hasAny);
-    container.innerHTML = html;
-    lucide.createIcons();
-}
-
-function renderCreateSections() {
-    const container = document.getElementById('create-sections-container');
-    if(!container) return;
-    let html = '', hasAnyLayer = false;
-    
-    for(let section of SECTIONS){
-        const layers = layersBySection[section] || [];
-        if(layers.length === 0) continue;
-        hasAnyLayer = true;
-        const isOpen = openSectionCreate === section;
-        const selectedItem = selectedOrder.find(item => item.section === section);
-        const selectedId = selectedItem ? selectedItem.layerId : null;
-        const isBackground = section === "Background";
-        
-        html += `
-            <div class="section-card ${isBackground?'bg-badge':''} fade-in">
-                <div onclick="App.toggleSectionCreate('${section}')" class="section-header">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                        <img src="https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/folder.png?raw=true" style="width:18px;height:18px;object-fit:contain" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2218%22 height=%2218%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23a78bfa%22 stroke-width=%222%22%3E%3Cpath d=%22M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7l-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z%22/%3E%3C/svg%3E'">
-                        <span class="section-name" style="color:${isBackground?'#34d399':'#c4b5fd'}">${section}</span>
-                        <span class="section-count">${layers.length} layers</span>
-                        <span class="section-badge ${getSectionBadgeClass(section)}">${getSectionBadgeLabel(section)}</span>
-                        ${selectedItem?`<span style="font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;color:#34d399">✓ ORDER ${selectedItem.order}</span>`:''}
-                    </div>
-                    <i data-lucide="chevron-down" style="width:16px;height:16px" class="accordion-icon ${isOpen?'rotate-180':''}"></i>
-                </div>
-                ${isOpen ? `
-                <div class="section-content" style="padding:0 16px 16px;border-top:1px solid var(--border)">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:14px">
-                        ${layers.map(layer => {
-                            const isSel = selectedId === layer.id;
-                            const orderNum = isSel ? selectedOrder.find(item => item.layerId === layer.id)?.order : null;
-                            return `
-                                <div onclick="App.selectLayer('${section}','${layer.id}','${escapeHtml(layer.value).replace(/'/g, "\\'")}','${layer.imageUrl.replace(/'/g, "\\'")}','${layer.gender}')"
-                                     class="layer-item ${isSel?'selected':''} ${layer.gender==='male'?'male-bg':'female-bg'}" style="cursor:pointer">
-                                    ${isSel && orderNum ? `<div class="order-number">${orderNum}</div>` : ''}
-                                    <img src="${layer.gender==='male'?'https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/male.png?raw=true':'https://github.com/nextpunks/nextpunks.github.io/blob/main/Icon/femenine.png?raw=true'}" class="gender-icon" onerror="this.style.display='none'">
-                                    <div style="aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg0);margin-bottom:6px">
-                                        <img src="${layer.imageUrl}" alt="${escapeHtml(layer.value)}" style="width:100%;height:100%;object-fit:contain" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22%3E%3Crect fill=%22%23111%22 width=%2260%22 height=%2260%22/%3E%3C/svg%3E'">
-                                    </div>
-                                    <p style="font-size:10px;font-family:'Rajdhani',sans-serif;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)">${escapeHtml(layer.value)}</p>
-                                </div>`;
-                        }).join('')}
-                    </div>
-                </div>` : ''}
-            </div>`;
-    }
-    
-    if(!hasAnyLayer) {
-        container.innerHTML = '<div class="empty-state">No layers in global library yet.<br>Be the first to add some layers!</div>';
-    } else {
-        container.innerHTML = html;
-    }
-    lucide.createIcons();
-    updateOrderPreview();
-}
-
-function selectLayer(section, layerId, value, imageUrl, gender) {
-    const existingIndex = selectedOrder.findIndex(item => item.section === section);
-    if(existingIndex !== -1){
-        selectedOrder.splice(existingIndex, 1);
-        selectedOrder.forEach((item, idx) => { item.order = idx + 1; });
-    } else {
-        selectedOrder.push({ section, layerId, value, imageUrl, gender, order: selectedOrder.length + 1 });
-    }
-    renderCreateSections();
-    updateLivePreview();
-}
-
-function updateOrderPreview() {
-    const div = document.getElementById('order-preview-list');
-    if(!div) return;
-    if(selectedOrder.length === 0){
-        div.innerHTML = '<span style="font-size:12px;color:var(--muted);font-family:Rajdhani,sans-serif;letter-spacing:1px">No layers selected</span>';
-        return;
-    }
-    div.innerHTML = selectedOrder.map(item => {
-        const isBg = item.section === "Background";
-        const traitLabel = isBg ? "BG" : item.section;
-        const genderIcon = item.gender === 'male' ? '♂' : '♀';
-        return `<span class="order-tag">
-            <span style="color:var(--neon2);font-weight:800">${item.order}</span>
-            <span style="color:${item.gender==='male'?'#60a5fa':'#f472b6'}">${genderIcon}</span>
-            <span style="color:${isBg?'#34d399':'#fbbf24'}">${traitLabel}</span>
-            <span style="color:var(--muted)">:</span>
-            <span>${escapeHtml(item.value)}</span>
-        </span>`;
-    }).join('');
-}
-
-async function compositeFromSelected() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 512, 512);
-    for(let item of selectedOrder){
-        await new Promise((resolve) => {
-            const img = new Image(); 
-            img.crossOrigin = "Anonymous";
-            img.onload = () => { ctx.drawImage(img, 0, 0, 512, 512); resolve(); };
-            img.onerror = () => resolve();
-            img.src = item.imageUrl;
-        });
+  // Composite image from selected layers (ordered by SECTIONS)
+  async function compositeFromSelected() {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,512,512);
+    const ordered = [];
+    for(let section of SECTIONS) if(selectedLayers[section]) ordered.push(selectedLayers[section]);
+    for(let item of ordered) {
+      await new Promise(resolve => { const img = new Image(); img.crossOrigin="Anonymous"; img.onload=()=>{ ctx.drawImage(img,0,0,512,512); resolve(); }; img.onerror=()=>resolve(); img.src = item.imageUrl; });
     }
     return canvas.toDataURL('image/png');
-}
+  }
 
-async function createNFT() {
-    if(selectedOrder.length === 0){ showToast('Please select at least one layer'); return; }
+  // Get next sequential number for filename
+  function getNextNumber() { return nfts.length + 1; }
+
+  // SINGLE MINT BUTTON (fixed)
+  async function mintSingleNFT() {
+    const ordered = [];
+    for(let section of SECTIONS) if(selectedLayers[section]) ordered.push(selectedLayers[section]);
+    if(ordered.length === 0) { showToast('❌ Please select at least one layer (except Background)'); return; }
     const nftName = document.getElementById('nft-name').value.trim() || "404 Punks";
     const description = document.getElementById('nft-description').value.trim();
-    const btn = document.getElementById('btn-create-nft');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="animate-spin" style="width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%"></div> Generating...';
-    
+    const btn = document.getElementById('mintButtonSingle');
+    btn.disabled = true; btn.innerHTML = '<div class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div> Minting...';
     try {
-        const imageData = await compositeFromSelected();
-        const attributes = selectedOrder
-            .filter(item => item.section !== "Background")
-            .map(item => ({ trait_type: item.section, value: item.value }));
-        attributes.push({ trait_type: "Attribute Count", value: attributes.length.toString() });
-        
-        const newNFT = {
-            id: Date.now() + Math.random().toString(36).substr(2, 6),
-            name: nftName,
-            description: description,
-            selectedLayers: selectedOrder.map(item => ({ section: item.section, value: item.value, gender: item.gender })),
-            image: imageData,
-            attributes: attributes,
-            cidPlaceholder: "ipfs://QmPlaceholder_ReplaceWithActualCID",
-            createdAt: new Date().toISOString()
-        };
-        
-        nfts.push(newNFT);
-        saveUserNFTs();
-        selectedOrder = [];
-        renderCreateSections();
-        renderCollection();
-        if(previewCtx){ previewCtx.clearRect(0,0,200,200); previewCtx.fillStyle='#05050f'; previewCtx.fillRect(0,0,200,200); }
-        showToast(`✅ "${nftName}" created and saved to YOUR collection!`);
-        switchTab('collection');
-    } catch(err){
-        showToast(`Error: ${err.message}`);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="sparkles" style="width:18px;height:18px"></i> Generate NFT';
-        lucide.createIcons();
-    }
-}
+      const imageData = await compositeFromSelected();
+      const attributes = buildAttributes(ordered);
+      const nextNum = getNextNumber();
+      const newNFT = {
+        id: Date.now() + '_' + Math.random().toString(36).substr(2,6),
+        name: nftName,
+        description: description,
+        image: imageData,
+        attributes: attributes,
+        number: nextNum,
+        fileName: `${nextNum}.png`,
+        jsonName: `${nextNum}.json`,
+        createdAt: Date.now()
+      };
+      nfts.push(newNFT);
+      saveUserNFTs();
+      // Clear selected layers after mint
+      selectedLayers = {};
+      renderCreateSections();
+      renderCollection();
+      if(previewCtx) { previewCtx.clearRect(0,0,240,240); previewCtx.fillStyle = '#0f172a'; previewCtx.fillRect(0,0,240,240); }
+      showToast(`✅ Minted #${nextNum} | ${nextNum}.png + ${nextNum}.json saved`);
+      switchTab('collection');
+    } catch(err) { showToast(`Error: ${err.message}`); } finally { btn.disabled=false; btn.innerHTML='✨ Mint NFT (Single)'; }
+  }
 
-function renderCollection() {
-    const container = document.getElementById('nft-list');
-    const empty = document.getElementById('nft-empty');
-    const countDiv = document.getElementById('nft-count');
+  // ---------- FIREBASE LAYERS SYNC ----------
+  function listenToFirebaseLayers() {
+    database.ref('layers').on('value', (snap) => {
+      const data = snap.val();
+      for(let s of SECTIONS) layersBySection[s] = (data && data[s]) ? data[s] : [];
+      renderSectionsLayers();
+      renderCreateSections();
+      document.getElementById('sync-status').innerHTML = '🌐 Firebase Sync ON';
+      document.getElementById('sync-status').className = 'text-xs px-3 py-1 bg-green-100 text-green-800 rounded-full font-bold';
+    });
+  }
+
+  async function addLayerToFirebase(section, layer) { const updated = [...(layersBySection[section]||[]), layer]; await database.ref(`layers/${section}`).set(updated); }
+  async function deleteLayerFromFirebase(section, layerId) { const filtered = (layersBySection[section]||[]).filter(l=>String(l.id)!==String(layerId)); await database.ref(`layers/${section}`).set(filtered); for(let sec in selectedLayers) if(selectedLayers[sec]?.layerId==layerId) delete selectedLayers[sec]; renderCreateSections(); updateLivePreview(); }
+
+  function renderSectionsLayers() {
+    const container = document.getElementById('sections-container');
     if(!container) return;
-    empty.classList.toggle('hidden', nfts.length > 0);
-    countDiv.innerHTML = nfts.length ? `<div class="count-badge"><span class="count-dot"></span>Your NFTs: ${nfts.length} minted</div>` : '';
-    if(!nfts.length){ container.innerHTML = ''; return; }
-    
-    container.innerHTML = nfts.map(nft => `
-        <div class="nft-card fade-in" onclick="App.viewMetadata('${nft.id}')">
-            <div style="aspect-ratio:1;background:var(--bg0);overflow:hidden;border-bottom:1px solid var(--border);position:relative">
-                <img src="${nft.image}" alt="${escapeHtml(nft.name)}" style="width:100%;height:100%;object-fit:contain">
-            </div>
-            <div style="padding:14px">
-                <h3 class="font-raj" style="font-size:16px;font-weight:700;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px">${escapeHtml(nft.name)}</h3>
-                <p style="font-family:'Orbitron',monospace;font-size:10px;color:var(--muted);margin-bottom:12px">${nft.attributes.length-1} ATTRIBUTES</p>
-                <div style="display:flex;gap:8px" onclick="event.stopPropagation()">
-                    <button onclick="App.downloadImage('${nft.id}')" class="btn-sm">📸 Image</button>
-                    <button onclick="App.downloadJSON('${nft.id}')" class="btn-sm">📄 JSON</button>
-                    <button onclick="App.deleteNFT('${nft.id}')" class="btn-sm btn-danger">🗑 Delete</button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-    lucide.createIcons();
-}
-
-function viewMetadata(id) {
-    const nft = nfts.find(n => n.id == id);
-    if(!nft) return;
-    const modal = document.createElement('div');
-    modal.className = 'modal-backdrop';
-    const attrsHtml = (nft.attributes || []).map(attr => `
-        <div class="attribute-badge">
-            <span style="font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#a78bfa">${escapeHtml(attr.trait_type)}</span>
-            <span style="font-family:'Orbitron',monospace;font-size:12px;color:var(--text)">${escapeHtml(attr.value)}</span>
-        </div>`).join('');
-        
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:20px">
-                <h2 class="font-raj" style="font-size:20px;font-weight:700;letter-spacing:2px;background:linear-gradient(135deg,#a78bfa,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">${escapeHtml(nft.name)}</h2>
-                <button onclick="this.closest('.modal-backdrop').remove()" style="color:var(--muted);font-size:20px;background:none;border:none;cursor:pointer;">✕</button>
-            </div>
-            <div style="aspect-ratio:1;background:var(--bg0);border-radius:10px;overflow:hidden;margin-bottom:16px;border:1px solid var(--border)">
-                <img src="${nft.image}" style="width:100%;height:100%;object-fit:contain">
-            </div>
-            <div style="margin-bottom:14px">
-                <p class="font-raj" style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Description</p>
-                <p style="font-size:13px;color:var(--text);line-height:1.6;background:rgba(124,58,237,0.06);padding:12px;border-radius:8px;border:1px solid var(--border)">${escapeHtml(nft.description)}</p>
-            </div>
-            <div style="margin-bottom:20px">
-                <p class="font-raj" style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Attributes</p>
-                <div style="display:flex;flex-direction:column;gap:6px">${attrsHtml}</div>
-            </div>
-            <div style="display:flex;gap:10px">
-                <button onclick="App.downloadJSON('${nft.id}'); this.closest('.modal-backdrop').remove();" class="btn-primary" style="flex:1">Download JSON</button>
-                <button onclick="App.downloadImage('${nft.id}');" class="btn-primary" style="flex:1">Download Image</button>
-            </div>
-        </div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
-}
-
-function downloadJSON(id) {
-    const nft = nfts.find(n => n.id == id);
-    if(!nft) return;
-    const metadata = { name: nft.name, description: nft.description, image: nft.cidPlaceholder, attributes: nft.attributes };
-    const blob = new Blob([JSON.stringify(metadata, null, 2)], {type: 'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${nft.name.replace(/[^a-z0-9]/gi, '_')}_metadata.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('JSON downloaded');
-}
-
-function downloadImage(id) {
-    const nft = nfts.find(n => n.id == id);
-    if(!nft) return;
-    const a = document.createElement('a');
-    a.href = nft.image;
-    a.download = `${nft.name.replace(/[^a-z0-9]/gi, '_')}_nft.png`;
-    a.click();
-    showToast('Image downloaded');
-}
-
-function deleteNFT(id) {
-    if(confirm('Delete this NFT from your collection?')){
-        nfts = nfts.filter(n => n.id != id);
-        saveUserNFTs();
-        renderCollection();
-        showToast('NFT deleted');
+    let html = '';
+    for(let section of SECTIONS) {
+      const layers = layersBySection[section] || [];
+      const isOpen = openSectionLayers === section;
+      html += `<div class="section-card rounded-xl overflow-hidden mb-3"><div onclick="App.toggleSectionLayers('${section}')" class="flex justify-between items-center p-3 bg-white/50 cursor-pointer"><span class="font-raj font-bold text-blue-900">${section} (${layers.length})</span><i data-lucide="chevron-down" style="width:18px" class="${isOpen?'rotate-180':''} transition"></i></div>`;
+      if(isOpen) {
+        html += `<div class="p-3 grid grid-cols-2 sm:grid-cols-4 gap-3">`;
+        layers.forEach(layer => {
+          html += `<div class="layer-item p-2"><img src="${layer.imageUrl}" class="w-full aspect-square object-contain rounded-lg bg-gray-100"><p class="text-xs font-bold mt-1 truncate">${escapeHtml(layer.value)}</p><button onclick="App.deleteLayer('${section}','${layer.id}')" class="text-red-600 text-[10px] w-full mt-1 bg-red-100 rounded py-1">Delete</button></div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
     }
-}
-
-function switchTab(tab) {
-    document.getElementById('panel-layers').classList.toggle('hidden', tab !== 'layers');
-    document.getElementById('panel-create').classList.toggle('hidden', tab !== 'create');
-    document.getElementById('panel-collection').classList.toggle('hidden', tab !== 'collection');
-    
-    const layerBtn = document.getElementById('tab-layers');
-    const createBtn = document.getElementById('tab-create');
-    const collectionBtn = document.getElementById('tab-collection');
-    
-    layerBtn.classList.toggle('active', tab === 'layers');
-    createBtn.classList.toggle('active', tab === 'create');
-    collectionBtn.classList.toggle('active', tab === 'collection');
-    
-    if(tab === 'create'){ renderCreateSections(); initPreviewCanvas(); updateLivePreview(); }
-    if(tab === 'collection') renderCollection();
+    container.innerHTML = html;
     lucide.createIcons();
-}
+  }
 
-async function init() {
-    loadUserNFTs();
-    initPreviewCanvas();
-    listenToFirebaseLayers(); // Start listening to Firebase real-time updates
+  function renderCreateSections() {
+    const container = document.getElementById('create-sections-container');
+    if(!container) return;
+    let html = '';
+    for(let section of SECTIONS) {
+      const layers = layersBySection[section] || [];
+      if(!layers.length) continue;
+      const isOpen = openSectionCreate === section;
+      const selected = selectedLayers[section];
+      html += `<div class="section-card rounded-xl overflow-hidden mb-3"><div onclick="App.toggleCreateSection('${section}')" class="flex justify-between items-center p-3 bg-white/50 cursor-pointer"><span class="font-raj font-bold text-blue-900">${section} ${selected ? '✓' : ''}</span><i data-lucide="chevron-down" style="width:18px" class="${isOpen?'rotate-180':''} transition"></i></div>`;
+      if(isOpen) {
+        html += `<div class="p-3 grid grid-cols-2 sm:grid-cols-4 gap-3">`;
+        layers.forEach(layer => {
+          const isSel = selected && selected.layerId === layer.id;
+          html += `<div onclick="App.selectLayer('${section}','${layer.id}','${escapeHtml(layer.value).replace(/'/g,"\\'")}','${layer.imageUrl.replace(/'/g,"\\'")}','${layer.gender}')" class="layer-item p-2 cursor-pointer ${isSel?'selected':''}"><img src="${layer.imageUrl}" class="w-full aspect-square object-contain rounded-lg bg-gray-100">${isSel ? '<div class="text-blue-600 text-center text-xs font-bold mt-1">✓ Selected</div>' : ''}<p class="text-xs text-center mt-1 font-medium">${escapeHtml(layer.value)}</p></div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+    if(!Object.values(layersBySection).some(arr=>arr.length)) container.innerHTML = '<div class="text-center p-6 text-gray-600">No global layers. Go to Layers tab & add.</div>';
+    else container.innerHTML = html;
     lucide.createIcons();
-}
+    updateOrderPreview();
+  }
 
-window.App = {
-    switchTab,
-    toggleSectionLayers,
-    toggleSectionCreate,
-    addLayer,
-    deleteLayer,
-    selectLayer,
-    createNFT,
-    viewMetadata,
-    downloadJSON,
-    downloadImage,
-    deleteNFT
-};
+  function selectLayer(section, layerId, value, imageUrl, gender) { selectedLayers[section] = { section, layerId, value, imageUrl, gender }; renderCreateSections(); updateLivePreview(); }
+  function updateOrderPreview() { const div = document.getElementById('order-preview-list'); if(!div) return; const ordered = []; for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); div.innerHTML = ordered.length ? ordered.map((l,i)=>`<span class="order-tag">${i+1}. ${l.section}: ${escapeHtml(l.value)}</span>`).join('') : '<span class="text-gray-500">No layers selected</span>'; }
+  async function updateLivePreview() { if(!previewCtx) { const can = document.getElementById('live-preview-canvas'); if(can) previewCtx = can.getContext('2d'); else return; } previewCtx.clearRect(0,0,240,240); previewCtx.fillStyle = '#0f172a'; previewCtx.fillRect(0,0,240,240); const ordered = []; for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); for(let item of ordered) { await new Promise(resolve => { const img = new Image(); img.crossOrigin="Anonymous"; img.onload=()=>{ previewCtx.drawImage(img,0,0,240,240); resolve(); }; img.onerror=()=>resolve(); img.src = item.imageUrl; }); } }
 
-init();
+  function renderCollection() {
+    const container = document.getElementById('nft-list'); const empty = document.getElementById('nft-empty'); const countDiv = document.getElementById('nft-count');
+    if(!container) return;
+    if(!nfts.length) { container.innerHTML=''; empty.classList.remove('hidden'); countDiv.innerHTML=''; return; }
+    empty.classList.add('hidden');
+    countDiv.innerHTML = `<div class="inline-flex items-center gap-2 bg-blue-100 px-4 py-1 rounded-full text-blue-800 text-sm font-bold">🎨 Total Minted: ${nfts.length}</div>`;
+    container.innerHTML = nfts.map(nft => {
+      const match = matchWithMaster(nft.attributes);
+      const matchHtml = match.matched ? `<span class="match-badge">✅ Match #${match.matchId}</span>` : `<span class="nomatch-badge">❌ No Match</span>`;
+      return `<div class="nft-card rounded-2xl overflow-hidden shadow-md cursor-pointer" onclick="App.viewMetadata('${nft.id}')"><div class="aspect-square bg-slate-800"><img src="${nft.image}" class="w-full h-full object-contain"></div><div class="p-3 bg-white/80"><div class="flex justify-between items-center"><h3 class="font-raj font-bold text-blue-900">${escapeHtml(nft.name)}</h3><span class="text-xs text-gray-600">#${nft.number}</span></div><div class="flex justify-between items-center mt-2">${matchHtml}<div class="flex gap-2" onclick="event.stopPropagation()"><button onclick="App.downloadImage('${nft.id}')" class="text-xs bg-gray-200 px-2 py-1 rounded">📸 PNG</button><button onclick="App.downloadJSON('${nft.id}')" class="text-xs bg-gray-200 px-2 py-1 rounded">📄 JSON</button><button onclick="App.deleteNFT('${nft.id}')" class="text-xs bg-red-200 px-2 py-1 rounded">🗑</button></div></div></div></div>`;
+    }).join('');
+  }
+
+  function downloadImage(id) { const nft = nfts.find(n=>String(n.id)===String(id)); if(nft) { const a=document.createElement('a'); a.href=nft.image; a.download=`${nft.number}.png`; a.click(); showToast(`Saved ${nft.number}.png`); } }
+  function downloadJSON(id) { const nft = nfts.find(n=>String(n.id)===String(id)); if(nft) { const metadata = { name: nft.name, description: nft.description, image: `ipfs://placeholder/${nft.number}.png`, attributes: nft.attributes }; const blob=new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${nft.number}.json`; a.click(); URL.revokeObjectURL(a.href); showToast(`Saved ${nft.number}.json`); } }
+  function deleteNFT(id) { if(confirm('Delete this NFT?')) { nfts = nfts.filter(n=>String(n.id)!==String(id)); saveUserNFTs(); renderCollection(); showToast('NFT removed'); } }
+  function viewMetadata(id) { const nft = nfts.find(n=>String(n.id)===String(id)); if(!nft) return; const match = matchWithMaster(nft.attributes); const matchLine = match.matched ? `<p class="text-green-700 text-sm mt-2 font-bold">✅ Matches official Punk #${match.matchId}</p>` : `<p class="text-red-700 text-sm mt-2 font-bold">❌ No match in official collection</p>`; const modal=document.createElement('div'); modal.className='fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-[999]'; modal.innerHTML=`<div class="modal-content rounded-2xl max-w-lg w-full p-5 max-h-[85vh] overflow-auto"><div class="flex justify-between"><h2 class="font-orb text-xl text-blue-900">${escapeHtml(nft.name)}</h2><button onclick="this.closest('.fixed').remove()" class="text-gray-600">✕</button></div><img src="${nft.image}" class="w-full rounded-xl my-3 border-2 border-blue-300"><div class="space-y-2"><p class="text-gray-700 text-sm">${escapeHtml(nft.description)}</p><div class="font-raj text-sm font-bold mt-2">Attributes:</div>${nft.attributes.map(a=>`<div class="attribute-badge"><span class="font-medium">${a.trait_type}</span><span>${escapeHtml(a.value)}</span></div>`).join('')}${matchLine}<div class="flex gap-3 mt-4"><button onclick="App.downloadImage('${nft.id}');this.closest('.fixed').remove()" class="flex-1 bg-blue-600 text-white py-2 rounded-xl">Save PNG (${nft.number}.png)</button><button onclick="App.downloadJSON('${nft.id}');this.closest('.fixed').remove()" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl">Save JSON (${nft.number}.json)</button></div></div></div>`; document.body.appendChild(modal); modal.onclick=e=>{if(e.target===modal)modal.remove();}; }
+
+  async function addLayer() { const url=document.getElementById('github-url').value.trim(); const val=document.getElementById('layer-value').value.trim(); const section=document.getElementById('layer-section').value; const gender=document.querySelector('input[name="layer-gender"]:checked').value; if(!url||!val){showToast('URL & Value required');return;} let finalUrl=url; if(url.includes('github.com')&&!url.includes('raw.githubusercontent.com')) finalUrl=url.replace('github.com','raw.githubusercontent.com').replace('/blob/','/'); const img=new Image(); img.onload=async()=>{const newLayer={id:Date.now()+'_'+Math.random().toString(36).substr(2,6),value:val,imageUrl:finalUrl,gender}; await addLayerToFirebase(section,newLayer); document.getElementById('github-url').value='';document.getElementById('layer-value').value='';showToast(`✅ "${val}" added to ${section}`);}; img.onerror=()=>showToast('Invalid image URL'); img.src=finalUrl; }
+  function deleteLayer(section,id){ if(confirm('Permanently delete from global library?')) deleteLayerFromFirebase(section,id); }
+  function switchTab(tab){ document.getElementById('panel-layers').classList.toggle('hidden',tab!=='layers'); document.getElementById('panel-create').classList.toggle('hidden',tab!=='create'); document.getElementById('panel-collection').classList.toggle('hidden',tab!=='collection'); if(tab==='create'){renderCreateSections();updateLivePreview();} if(tab==='collection')renderCollection(); }
+  function toggleSectionLayers(s){ openSectionLayers = openSectionLayers===s?null:s; renderSectionsLayers(); }
+  function toggleCreateSection(s){ openSectionCreate = openSectionCreate===s?null:s; renderCreateSections(); }
+
+  window.App = { switchTab, addLayer, deleteLayer, selectLayer, mintSingleNFT, downloadImage, downloadJSON, deleteNFT, viewMetadata, toggleSectionLayers, toggleCreateSection };
+  
+  // Event binding for mint button
+  document.getElementById('mintButtonSingle')?.addEventListener('click', (e) => { e.preventDefault(); mintSingleNFT(); });
+  
+  loadUserNFTs();
+  fetchMasterIndex().then(() => renderCollection());
+  listenToFirebaseLayers();
+  renderCollection();
+  previewCtx = document.getElementById('live-preview-canvas')?.getContext('2d');
+  if(previewCtx) { previewCtx.fillStyle = '#0f172a'; previewCtx.fillRect(0,0,240,240); }
 </script>
 </body>
 </html>
