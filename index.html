@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>404 PUNKS | Genesis Mint + Match System</title>
+  <title>404 PUNKS | Genesis Mint + Smart Match System</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -17,15 +17,14 @@
       min-height: 100vh;
       color: #0f172a;
     }
-    /* glass morphism for cards */
     .glass-card, .section-card, .nft-card, .modal-content {
-      background: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(59, 130, 246, 0.25);
+      border: 1px solid rgba(59, 130, 246, 0.3);
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
     }
     .layer-item {
-      background: rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(4px);
       border-radius: 16px;
       border: 1px solid #93c5fd;
@@ -34,7 +33,7 @@
     }
     .layer-item.selected {
       border-color: #3b82f6;
-      background: rgba(59, 130, 246, 0.2);
+      background: rgba(59, 130, 246, 0.25);
       box-shadow: 0 0 0 2px #3b82f6;
     }
     .tab-btn {
@@ -55,7 +54,7 @@
     }
     .btn-primary:hover, .btn-generate:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(37,99,235,0.3);
+      box-shadow: 0 8px 20px rgba(37,99,235,0.4);
     }
     .match-badge { background: #22c55e20; color: #15803d; border: 1px solid #22c55e; border-radius: 40px; padding: 4px 12px; font-size: 12px; font-weight: bold; }
     .nomatch-badge { background: #ef444420; color: #b91c1c; border: 1px solid #ef4444; border-radius: 40px; padding: 4px 12px; font-size: 12px; font-weight: bold; }
@@ -67,6 +66,8 @@
     .section-header { cursor: pointer; user-select: none; }
     .nft-input { background: white; border: 1px solid #cbd5e1; border-radius: 16px; padding: 12px 16px; width: 100%; outline: none; transition: 0.2s; }
     .nft-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px #93c5fd; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 1s linear infinite; display: inline-block; }
   </style>
 </head>
 <body>
@@ -80,7 +81,7 @@
     </div>
     <div class="flex gap-3">
       <span id="sync-status" class="text-xs px-3 py-1 bg-green-100 text-green-800 rounded-full font-bold">🌐 Firebase Live</span>
-      <span class="text-xs px-3 py-1 bg-blue-100 text-blue-800 rounded-full">Match System v2</span>
+      <span class="text-xs px-3 py-1 bg-blue-100 text-blue-800 rounded-full">Smart Match v3</span>
     </div>
   </header>
 
@@ -113,7 +114,7 @@
 
   <!-- CREATE PANEL - Single Mint -->
   <div id="panel-create" class="space-y-5 hidden">
-    <div class="glass-card p-4 rounded-xl text-sm text-gray-700"><span class="font-bold text-blue-800">⚡ JSON Rules:</span> Only <span class="text-indigo-700 font-bold">"Base"</span> remains as trait_type. All other traits (Head, Eyes, Mouth, Accessory, etc) become <strong>"Accessory"</strong>. Background excluded. <br>🔍 <strong>Auto-match:</strong> Your NFT compares with official index.json (Type + Accessories values). Shows exact match ID or "No match".</div>
+    <div class="glass-card p-4 rounded-xl text-sm text-gray-700"><span class="font-bold text-blue-800">⚡ JSON Rules:</span> <span class="text-indigo-700 font-bold">"trait_type": ","</span> (কমা) for Base layer. All other traits become <strong>"Accessory"</strong>. Background excluded. <br>🔍 <strong>Smart Match System:</strong> আপনার NFT-এর সব Attributes (Base + Accessories) অর্ডার নির্বিশেষে ম্যাচ হবে। Attribute Count ইগনোর করা হয়।</div>
     <div class="glass-card p-5 flex flex-col items-center rounded-2xl"><canvas id="live-preview-canvas" width="240" height="240" class="preview-canvas w-[240px] h-[240px]"></canvas><p class="text-gray-600 text-xs mt-2">Live preview (bottom → top order)</p></div>
     <div id="create-sections-container" class="space-y-4 max-h-[45vh] overflow-auto pr-1"></div>
     <div class="glass-card p-4 rounded-xl"><p class="font-raj font-bold text-blue-900 mb-2">Selected layers order</p><div id="order-preview-list" class="flex flex-wrap gap-2"></div></div>
@@ -148,106 +149,131 @@
 
   const SECTIONS = ["Background","Base","Head","Eyes","Mouth","Accessory","Nose","Neck","Face","Ear","Beard"];
   let layersBySection = {};
-  let selectedLayers = {};   // { section: {layerId, value, imageUrl, gender} }
+  let selectedLayers = {};
   let nfts = [];
-  let masterIndexMap = [];    // array of { id, traits: [typeValue, accessory1, accessory2, accessory3] }
+  let masterIndexMap = [];    // array of { id, traitValues: [value1, value2, ...] } - sorted for comparison
   let previewCtx = null;
   let openSectionCreate = null, openSectionLayers = null;
 
   for(let s of SECTIONS) layersBySection[s] = [];
 
-  // Helper
   function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 3000); }
   function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
-  // Load local NFTs
-  function loadUserNFTs() { try { const saved = localStorage.getItem('404punks_mainnet_v2'); if(saved) nfts = JSON.parse(saved); else nfts = []; } catch(e){} }
-  function saveUserNFTs() { localStorage.setItem('404punks_mainnet_v2', JSON.stringify(nfts)); }
+  function loadUserNFTs() { try { const saved = localStorage.getItem('404punks_mainnet_v4'); if(saved) nfts = JSON.parse(saved); else nfts = []; } catch(e){} }
+  function saveUserNFTs() { localStorage.setItem('404punks_mainnet_v4', JSON.stringify(nfts)); }
 
   // ---------- MASTER INDEX FETCH & PARSE (official index.json) ----------
+  // Extract all trait values except "Attribute Count" and "Type" (we'll map Type to Base)
+  // For matching: we compare the SET of values (Base + all Accessories) regardless of order
   async function fetchMasterIndex() {
     try {
       const res = await fetch('https://raw.githubusercontent.com/404punkslab/404punkslab.github.io/main/index.json');
       if(!res.ok) throw new Error('HTTP error');
       const data = await res.json();
-      // data structure: { "1": { attributes: [...] }, "2": ... }
       masterIndexMap = [];
       for(let key in data) {
         const item = data[key];
         if(!item.attributes) continue;
-        let typeVal = null;
-        let accessories = [];
+        let traitValues = [];
         for(let attr of item.attributes) {
-          if(attr.trait_type === 'Type') typeVal = attr.value;
-          else if(attr.trait_type && attr.trait_type.startsWith('Accessory')) {
-            accessories.push(attr.value);
+          // Skip "Attribute Count"
+          if(attr.trait_type === 'Attribute Count') continue;
+          // "Type" is treated as Base value
+          if(attr.trait_type === 'Type') {
+            traitValues.push(attr.value);
+          }
+          // All Accessory values
+          else if(attr.trait_type && attr.trait_type.toLowerCase().includes('accessory')) {
+            traitValues.push(attr.value);
           }
         }
-        if(typeVal) {
-          const traits = [typeVal, ...accessories.slice(0,3)];  // first 3 accessories
-          masterIndexMap.push({ id: parseInt(key), traits });
-        }
+        // Sort for consistent comparison (order doesn't matter)
+        traitValues.sort();
+        masterIndexMap.push({ id: parseInt(key), traitValues });
       }
-      console.log('Master index loaded:', masterIndexMap.length);
-    } catch(e) { console.warn('Failed to load index.json', e); masterIndexMap = []; }
+      console.log('Master index loaded:', masterIndexMap.length, 'items');
+      showToast(`✅ Loaded ${masterIndexMap.length} official punks for smart matching`);
+    } catch(e) { 
+      console.warn('Failed to load index.json', e); 
+      masterIndexMap = [];
+      showToast('⚠️ Could not load official index.json');
+    }
   }
 
-  // Match function: compare generated NFT's Type (Base) + accessory values
+  // SMART MATCH FUNCTION - compares ALL trait values (Base + Accessories) regardless of order
+  // Ignores "Attribute Count" completely
   function matchWithMaster(attributes) {
     if(!masterIndexMap.length) return { matched: false, matchId: null, reason: 'Master data not loaded' };
-    // Extract "Base" value as Type, and all "Accessory" values (ignore "Attribute Count")
-    let baseValue = null;
-    let accessoryValues = [];
+    
+    // Extract all trait values from NFT (excluding Attribute Count)
+    let nftValues = [];
     for(let a of attributes) {
-      if(a.trait_type === 'Base') baseValue = a.value;
-      else if(a.trait_type === 'Accessory') accessoryValues.push(a.value);
+      if(a.trait_type === 'Attribute Count') continue;
+      // trait_type can be "," (comma) for Base or "Accessory" for others
+      nftValues.push(a.value);
     }
-    if(!baseValue) return { matched: false, matchId: null, reason: 'No Base trait' };
-    const nftTraits = [baseValue, ...accessoryValues.slice(0,3)];
+    // Sort for order-independent comparison
+    nftValues.sort();
+    
+    // Find match in master index
     for(let master of masterIndexMap) {
-      if(JSON.stringify(nftTraits) === JSON.stringify(master.traits)) {
+      if(JSON.stringify(nftValues) === JSON.stringify(master.traitValues)) {
         return { matched: true, matchId: master.id };
       }
     }
     return { matched: false, matchId: null };
   }
 
-  // Build attributes: only Base remains trait_type "Base", all others become "Accessory"
+  // Build attributes: Base becomes "," (comma), others become "Accessory"
   function buildAttributes(orderedLayers) {
     const attrs = [];
     for(let layer of orderedLayers) {
       if(layer.section === "Background") continue;
-      const trait_type = (layer.section === "Base") ? "Base" : "Accessory";
-      attrs.push({ trait_type, value: layer.value });
+      let trait_type;
+      if(layer.section === "Base") {
+        trait_type = ",";  // Comma character as requested
+      } else {
+        trait_type = "Accessory";
+      }
+      attrs.push({ trait_type: trait_type, value: layer.value });
     }
     attrs.push({ trait_type: "Attribute Count", value: attrs.length.toString() });
     return attrs;
   }
 
-  // Composite image from selected layers (ordered by SECTIONS)
+  // Composite image from selected layers
   async function compositeFromSelected() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,512,512);
     const ordered = [];
     for(let section of SECTIONS) if(selectedLayers[section]) ordered.push(selectedLayers[section]);
     for(let item of ordered) {
-      await new Promise(resolve => { const img = new Image(); img.crossOrigin="Anonymous"; img.onload=()=>{ ctx.drawImage(img,0,0,512,512); resolve(); }; img.onerror=()=>resolve(); img.src = item.imageUrl; });
+      await new Promise(resolve => { 
+        const img = new Image(); 
+        img.crossOrigin = "Anonymous"; 
+        img.onload = () => { ctx.drawImage(img, 0, 0, 512, 512); resolve(); }; 
+        img.onerror = () => resolve(); 
+        img.src = item.imageUrl; 
+      });
     }
     return canvas.toDataURL('image/png');
   }
 
-  // Get next sequential number for filename
   function getNextNumber() { return nfts.length + 1; }
 
-  // SINGLE MINT BUTTON (fixed)
+  // SINGLE MINT BUTTON
   async function mintSingleNFT() {
     const ordered = [];
     for(let section of SECTIONS) if(selectedLayers[section]) ordered.push(selectedLayers[section]);
     if(ordered.length === 0) { showToast('❌ Please select at least one layer (except Background)'); return; }
+    
     const nftName = document.getElementById('nft-name').value.trim() || "404 Punks";
     const description = document.getElementById('nft-description').value.trim();
     const btn = document.getElementById('mintButtonSingle');
-    btn.disabled = true; btn.innerHTML = '<div class="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div> Minting...';
+    btn.disabled = true; 
+    btn.innerHTML = '<span class="animate-spin mr-2">⚡</span> Minting...';
+    
     try {
       const imageData = await compositeFromSelected();
       const attributes = buildAttributes(ordered);
@@ -265,6 +291,7 @@
       };
       nfts.push(newNFT);
       saveUserNFTs();
+      
       // Clear selected layers after mint
       selectedLayers = {};
       renderCreateSections();
@@ -272,7 +299,12 @@
       if(previewCtx) { previewCtx.clearRect(0,0,240,240); previewCtx.fillStyle = '#0f172a'; previewCtx.fillRect(0,0,240,240); }
       showToast(`✅ Minted #${nextNum} | ${nextNum}.png + ${nextNum}.json saved`);
       switchTab('collection');
-    } catch(err) { showToast(`Error: ${err.message}`); } finally { btn.disabled=false; btn.innerHTML='✨ Mint NFT (Single)'; }
+    } catch(err) { 
+      showToast(`Error: ${err.message}`); 
+    } finally { 
+      btn.disabled = false; 
+      btn.innerHTML = '✨ Mint NFT (Single)'; 
+    }
   }
 
   // ---------- FIREBASE LAYERS SYNC ----------
@@ -283,7 +315,6 @@
       renderSectionsLayers();
       renderCreateSections();
       document.getElementById('sync-status').innerHTML = '🌐 Firebase Sync ON';
-      document.getElementById('sync-status').className = 'text-xs px-3 py-1 bg-green-100 text-green-800 rounded-full font-bold';
     });
   }
 
@@ -339,10 +370,29 @@
 
   function selectLayer(section, layerId, value, imageUrl, gender) { selectedLayers[section] = { section, layerId, value, imageUrl, gender }; renderCreateSections(); updateLivePreview(); }
   function updateOrderPreview() { const div = document.getElementById('order-preview-list'); if(!div) return; const ordered = []; for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); div.innerHTML = ordered.length ? ordered.map((l,i)=>`<span class="order-tag">${i+1}. ${l.section}: ${escapeHtml(l.value)}</span>`).join('') : '<span class="text-gray-500">No layers selected</span>'; }
-  async function updateLivePreview() { if(!previewCtx) { const can = document.getElementById('live-preview-canvas'); if(can) previewCtx = can.getContext('2d'); else return; } previewCtx.clearRect(0,0,240,240); previewCtx.fillStyle = '#0f172a'; previewCtx.fillRect(0,0,240,240); const ordered = []; for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); for(let item of ordered) { await new Promise(resolve => { const img = new Image(); img.crossOrigin="Anonymous"; img.onload=()=>{ previewCtx.drawImage(img,0,0,240,240); resolve(); }; img.onerror=()=>resolve(); img.src = item.imageUrl; }); } }
+  
+  async function updateLivePreview() { 
+    if(!previewCtx) { const can = document.getElementById('live-preview-canvas'); if(can) previewCtx = can.getContext('2d'); else return; } 
+    previewCtx.clearRect(0,0,240,240); 
+    previewCtx.fillStyle = '#0f172a'; 
+    previewCtx.fillRect(0,0,240,240); 
+    const ordered = []; 
+    for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); 
+    for(let item of ordered) { 
+      await new Promise(resolve => { 
+        const img = new Image(); 
+        img.crossOrigin = "Anonymous"; 
+        img.onload = () => { previewCtx.drawImage(img, 0, 0, 240, 240); resolve(); }; 
+        img.onerror = () => resolve(); 
+        img.src = item.imageUrl; 
+      }); 
+    } 
+  }
 
   function renderCollection() {
-    const container = document.getElementById('nft-list'); const empty = document.getElementById('nft-empty'); const countDiv = document.getElementById('nft-count');
+    const container = document.getElementById('nft-list'); 
+    const empty = document.getElementById('nft-empty'); 
+    const countDiv = document.getElementById('nft-count');
     if(!container) return;
     if(!nfts.length) { container.innerHTML=''; empty.classList.remove('hidden'); countDiv.innerHTML=''; return; }
     empty.classList.add('hidden');
@@ -355,11 +405,52 @@
   }
 
   function downloadImage(id) { const nft = nfts.find(n=>String(n.id)===String(id)); if(nft) { const a=document.createElement('a'); a.href=nft.image; a.download=`${nft.number}.png`; a.click(); showToast(`Saved ${nft.number}.png`); } }
-  function downloadJSON(id) { const nft = nfts.find(n=>String(n.id)===String(id)); if(nft) { const metadata = { name: nft.name, description: nft.description, image: `ipfs://placeholder/${nft.number}.png`, attributes: nft.attributes }; const blob=new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`${nft.number}.json`; a.click(); URL.revokeObjectURL(a.href); showToast(`Saved ${nft.number}.json`); } }
+  function downloadJSON(id) { 
+    const nft = nfts.find(n=>String(n.id)===String(id)); 
+    if(nft) { 
+      const metadata = { 
+        name: nft.name, 
+        description: nft.description, 
+        image: `ipfs://placeholder/${nft.number}.png`, 
+        attributes: nft.attributes 
+      }; 
+      const blob=new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'}); 
+      const a=document.createElement('a'); 
+      a.href=URL.createObjectURL(blob); 
+      a.download=`${nft.number}.json`; 
+      a.click(); 
+      URL.revokeObjectURL(a.href); 
+      showToast(`Saved ${nft.number}.json`); 
+    } 
+  }
   function deleteNFT(id) { if(confirm('Delete this NFT?')) { nfts = nfts.filter(n=>String(n.id)!==String(id)); saveUserNFTs(); renderCollection(); showToast('NFT removed'); } }
-  function viewMetadata(id) { const nft = nfts.find(n=>String(n.id)===String(id)); if(!nft) return; const match = matchWithMaster(nft.attributes); const matchLine = match.matched ? `<p class="text-green-700 text-sm mt-2 font-bold">✅ Matches official Punk #${match.matchId}</p>` : `<p class="text-red-700 text-sm mt-2 font-bold">❌ No match in official collection</p>`; const modal=document.createElement('div'); modal.className='fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-[999]'; modal.innerHTML=`<div class="modal-content rounded-2xl max-w-lg w-full p-5 max-h-[85vh] overflow-auto"><div class="flex justify-between"><h2 class="font-orb text-xl text-blue-900">${escapeHtml(nft.name)}</h2><button onclick="this.closest('.fixed').remove()" class="text-gray-600">✕</button></div><img src="${nft.image}" class="w-full rounded-xl my-3 border-2 border-blue-300"><div class="space-y-2"><p class="text-gray-700 text-sm">${escapeHtml(nft.description)}</p><div class="font-raj text-sm font-bold mt-2">Attributes:</div>${nft.attributes.map(a=>`<div class="attribute-badge"><span class="font-medium">${a.trait_type}</span><span>${escapeHtml(a.value)}</span></div>`).join('')}${matchLine}<div class="flex gap-3 mt-4"><button onclick="App.downloadImage('${nft.id}');this.closest('.fixed').remove()" class="flex-1 bg-blue-600 text-white py-2 rounded-xl">Save PNG (${nft.number}.png)</button><button onclick="App.downloadJSON('${nft.id}');this.closest('.fixed').remove()" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl">Save JSON (${nft.number}.json)</button></div></div></div>`; document.body.appendChild(modal); modal.onclick=e=>{if(e.target===modal)modal.remove();}; }
+  
+  function viewMetadata(id) { 
+    const nft = nfts.find(n=>String(n.id)===String(id)); 
+    if(!nft) return; 
+    const match = matchWithMaster(nft.attributes); 
+    const matchLine = match.matched ? `<p class="text-green-700 text-sm mt-2 font-bold">✅ Smart Match Found: Official Punk #${match.matchId}</p><p class="text-green-600 text-xs">(Attributes matched regardless of order)</p>` : `<p class="text-red-700 text-sm mt-2 font-bold">❌ No match in official collection</p><p class="text-red-500 text-xs">No Punk found with these traits</p>`; 
+    const modal=document.createElement('div'); 
+    modal.className='fixed inset-0 bg-black/70 backdrop-blur flex items-center justify-center z-[999]'; 
+    modal.innerHTML=`<div class="modal-content rounded-2xl max-w-lg w-full p-5 max-h-[85vh] overflow-auto"><div class="flex justify-between"><h2 class="font-orb text-xl text-blue-900">${escapeHtml(nft.name)}</h2><button onclick="this.closest('.fixed').remove()" class="text-gray-600">✕</button></div><img src="${nft.image}" class="w-full rounded-xl my-3 border-2 border-blue-300"><div class="space-y-2"><p class="text-gray-700 text-sm">${escapeHtml(nft.description)}</p><div class="font-raj text-sm font-bold mt-2">Attributes (for matching):</div>${nft.attributes.map(a=>`<div class="attribute-badge"><span class="font-medium">${a.trait_type === "," ? "','" : a.trait_type}</span><span>${escapeHtml(a.value)}</span></div>`).join('')}${matchLine}<div class="flex gap-3 mt-4"><button onclick="App.downloadImage('${nft.id}');this.closest('.fixed').remove()" class="flex-1 bg-blue-600 text-white py-2 rounded-xl">Save PNG (${nft.number}.png)</button><button onclick="App.downloadJSON('${nft.id}');this.closest('.fixed').remove()" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl">Save JSON (${nft.number}.json)</button></div></div></div>`; 
+    document.body.appendChild(modal); 
+    modal.onclick=e=>{if(e.target===modal)modal.remove();}; 
+  }
 
-  async function addLayer() { const url=document.getElementById('github-url').value.trim(); const val=document.getElementById('layer-value').value.trim(); const section=document.getElementById('layer-section').value; const gender=document.querySelector('input[name="layer-gender"]:checked').value; if(!url||!val){showToast('URL & Value required');return;} let finalUrl=url; if(url.includes('github.com')&&!url.includes('raw.githubusercontent.com')) finalUrl=url.replace('github.com','raw.githubusercontent.com').replace('/blob/','/'); const img=new Image(); img.onload=async()=>{const newLayer={id:Date.now()+'_'+Math.random().toString(36).substr(2,6),value:val,imageUrl:finalUrl,gender}; await addLayerToFirebase(section,newLayer); document.getElementById('github-url').value='';document.getElementById('layer-value').value='';showToast(`✅ "${val}" added to ${section}`);}; img.onerror=()=>showToast('Invalid image URL'); img.src=finalUrl; }
+  async function addLayer() { 
+    const url=document.getElementById('github-url').value.trim(); 
+    const val=document.getElementById('layer-value').value.trim(); 
+    const section=document.getElementById('layer-section').value; 
+    const gender=document.querySelector('input[name="layer-gender"]:checked').value; 
+    if(!url||!val){showToast('URL & Value required');return;} 
+    let finalUrl=url; 
+    if(url.includes('github.com')&&!url.includes('raw.githubusercontent.com')) finalUrl=url.replace('github.com','raw.githubusercontent.com').replace('/blob/','/'); 
+    const img=new Image(); 
+    img.onload=async()=>{const newLayer={id:Date.now()+'_'+Math.random().toString(36).substr(2,6),value:val,imageUrl:finalUrl,gender}; await addLayerToFirebase(section,newLayer); document.getElementById('github-url').value='';document.getElementById('layer-value').value='';showToast(`✅ "${val}" added to ${section}`);}; 
+    img.onerror=()=>showToast('Invalid image URL'); 
+    img.src=finalUrl; 
+  }
+  
   function deleteLayer(section,id){ if(confirm('Permanently delete from global library?')) deleteLayerFromFirebase(section,id); }
   function switchTab(tab){ document.getElementById('panel-layers').classList.toggle('hidden',tab!=='layers'); document.getElementById('panel-create').classList.toggle('hidden',tab!=='create'); document.getElementById('panel-collection').classList.toggle('hidden',tab!=='collection'); if(tab==='create'){renderCreateSections();updateLivePreview();} if(tab==='collection')renderCollection(); }
   function toggleSectionLayers(s){ openSectionLayers = openSectionLayers===s?null:s; renderSectionsLayers(); }
@@ -367,7 +458,6 @@
 
   window.App = { switchTab, addLayer, deleteLayer, selectLayer, mintSingleNFT, downloadImage, downloadJSON, deleteNFT, viewMetadata, toggleSectionLayers, toggleCreateSection };
   
-  // Event binding for mint button
   document.getElementById('mintButtonSingle')?.addEventListener('click', (e) => { e.preventDefault(); mintSingleNFT(); });
   
   loadUserNFTs();
