@@ -114,10 +114,10 @@
 
   <!-- CREATE PANEL - Single Mint -->
   <div id="panel-create" class="space-y-5 hidden">
-    <div class="glass-card p-4 rounded-xl text-sm text-gray-700"><span class="font-bold text-blue-800">⚡ JSON Rules:</span> <span class="text-indigo-700 font-bold">"trait_type": ","</span> (কমা) for Base layer. All other traits become <strong>"Accessory"</strong>. Background excluded. <br>🔍 <strong>Smart Match System:</strong> আপনার NFT-এর সব Attributes (Base + Accessories) অর্ডার নির্বিশেষে ম্যাচ হবে। Attribute Count ইগনোর করা হয়।</div>
-    <div class="glass-card p-5 flex flex-col items-center rounded-2xl"><canvas id="live-preview-canvas" width="240" height="240" class="preview-canvas w-[240px] h-[240px]"></canvas><p class="text-gray-600 text-xs mt-2">Live preview (bottom → top order)</p></div>
+    <div class="glass-card p-4 rounded-xl text-sm text-gray-700"><span class="font-bold text-blue-800">⚡ JSON Rules:</span> <span class="text-indigo-700 font-bold">"trait_type": ","</span> (কমা) for Base layer. All other traits become <strong>"Accessory"</strong>. Background excluded. <br>🔍 <strong>Smart Match System:</strong> আপনার NFT-এর সব Attributes (Base + Accessories) অর্ডার নির্বিশেষে ম্যাচ হবে। Attribute Count ইগনোর করা হয়।<br>📌 <strong>Layer Stacking:</strong> প্রথম যে লেয়ার সিলেক্ট করবেন সেটা নিচে থাকবে, পরেরটা তার উপরে - ক্রমান্বয়ে স্ট্যাক হবে।</div>
+    <div class="glass-card p-5 flex flex-col items-center rounded-2xl"><canvas id="live-preview-canvas" width="240" height="240" class="preview-canvas w-[240px] h-[240px]"></canvas><p class="text-gray-600 text-xs mt-2">Live preview (bottom → top order as per selection sequence)</p></div>
     <div id="create-sections-container" class="space-y-4 max-h-[45vh] overflow-auto pr-1"></div>
-    <div class="glass-card p-4 rounded-xl"><p class="font-raj font-bold text-blue-900 mb-2">Selected layers order</p><div id="order-preview-list" class="flex flex-wrap gap-2"></div></div>
+    <div class="glass-card p-4 rounded-xl"><p class="font-raj font-bold text-blue-900 mb-2">Selected layers order (bottom to top)</p><div id="order-preview-list" class="flex flex-wrap gap-2"></div></div>
     <input type="text" id="nft-name" placeholder="NFT Name" value="404 Punks" class="nft-input">
     <textarea id="nft-description" rows="2" placeholder="Description" class="nft-input">Limited glitch artifact from the 404 dimension.</textarea>
     <button id="mintButtonSingle" class="btn-generate w-full py-4 text-white rounded-xl font-bold text-lg shadow-lg">✨ Mint NFT (Single)</button>
@@ -149,9 +149,10 @@
 
   const SECTIONS = ["Background","Base","Head","Eyes","Mouth","Accessory","Nose","Neck","Face","Ear","Beard"];
   let layersBySection = {};
-  let selectedLayers = {};
+  // CHANGED: selectedLayersArray stores layers in selection order (first = bottom, last = top)
+  let selectedLayersArray = [];  // each element: { section, layerId, value, imageUrl, gender }
   let nfts = [];
-  let masterIndexMap = [];    // array of { id, traitValues: [value1, value2, ...] } - sorted for comparison
+  let masterIndexMap = [];
   let previewCtx = null;
   let openSectionCreate = null, openSectionLayers = null;
 
@@ -160,12 +161,10 @@
   function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 3000); }
   function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 
-  function loadUserNFTs() { try { const saved = localStorage.getItem('404punks_mainnet_v4'); if(saved) nfts = JSON.parse(saved); else nfts = []; } catch(e){} }
-  function saveUserNFTs() { localStorage.setItem('404punks_mainnet_v4', JSON.stringify(nfts)); }
+  function loadUserNFTs() { try { const saved = localStorage.getItem('404punks_mainnet_v5'); if(saved) nfts = JSON.parse(saved); else nfts = []; } catch(e){} }
+  function saveUserNFTs() { localStorage.setItem('404punks_mainnet_v5', JSON.stringify(nfts)); }
 
   // ---------- MASTER INDEX FETCH & PARSE (official index.json) ----------
-  // Extract all trait values except "Attribute Count" and "Type" (we'll map Type to Base)
-  // For matching: we compare the SET of values (Base + all Accessories) regardless of order
   async function fetchMasterIndex() {
     try {
       const res = await fetch('https://raw.githubusercontent.com/404punkslab/404punkslab.github.io/main/index.json');
@@ -177,18 +176,14 @@
         if(!item.attributes) continue;
         let traitValues = [];
         for(let attr of item.attributes) {
-          // Skip "Attribute Count"
           if(attr.trait_type === 'Attribute Count') continue;
-          // "Type" is treated as Base value
           if(attr.trait_type === 'Type') {
             traitValues.push(attr.value);
           }
-          // All Accessory values
           else if(attr.trait_type && attr.trait_type.toLowerCase().includes('accessory')) {
             traitValues.push(attr.value);
           }
         }
-        // Sort for consistent comparison (order doesn't matter)
         traitValues.sort();
         masterIndexMap.push({ id: parseInt(key), traitValues });
       }
@@ -201,22 +196,17 @@
     }
   }
 
-  // SMART MATCH FUNCTION - compares ALL trait values (Base + Accessories) regardless of order
-  // Ignores "Attribute Count" completely
+  // SMART MATCH FUNCTION - compares ALL trait values regardless of order
   function matchWithMaster(attributes) {
     if(!masterIndexMap.length) return { matched: false, matchId: null, reason: 'Master data not loaded' };
     
-    // Extract all trait values from NFT (excluding Attribute Count)
     let nftValues = [];
     for(let a of attributes) {
       if(a.trait_type === 'Attribute Count') continue;
-      // trait_type can be "," (comma) for Base or "Accessory" for others
       nftValues.push(a.value);
     }
-    // Sort for order-independent comparison
     nftValues.sort();
     
-    // Find match in master index
     for(let master of masterIndexMap) {
       if(JSON.stringify(nftValues) === JSON.stringify(master.traitValues)) {
         return { matched: true, matchId: master.id };
@@ -232,7 +222,7 @@
       if(layer.section === "Background") continue;
       let trait_type;
       if(layer.section === "Base") {
-        trait_type = ",";  // Comma character as requested
+        trait_type = ",";
       } else {
         trait_type = "Accessory";
       }
@@ -242,13 +232,12 @@
     return attrs;
   }
 
-  // Composite image from selected layers
+  // Composite image - draws layers in the order they were selected (first = bottom)
   async function compositeFromSelected() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,512,512);
-    const ordered = [];
-    for(let section of SECTIONS) if(selectedLayers[section]) ordered.push(selectedLayers[section]);
-    for(let item of ordered) {
+    // Draw in the order of selection: first selected at bottom, last on top
+    for(let item of selectedLayersArray) {
       await new Promise(resolve => { 
         const img = new Image(); 
         img.crossOrigin = "Anonymous"; 
@@ -262,11 +251,34 @@
 
   function getNextNumber() { return nfts.length + 1; }
 
+  // SELECT LAYER - adds to array (if not already present) or removes if already selected
+  // Selection order: first selected becomes bottom layer, each new selection goes on top
+  function toggleLayerSelection(section, layerId, value, imageUrl, gender) {
+    const existingIndex = selectedLayersArray.findIndex(l => l.section === section);
+    if(existingIndex !== -1) {
+      // Remove this section's layer
+      selectedLayersArray.splice(existingIndex, 1);
+    } else {
+      // Add new layer to the END (topmost layer)
+      selectedLayersArray.push({ section, layerId, value, imageUrl, gender });
+    }
+    renderCreateSections();
+    updateOrderPreview();
+    updateLivePreview();
+  }
+
+  // Clear all selections
+  function clearAllSelections() {
+    selectedLayersArray = [];
+    renderCreateSections();
+    updateOrderPreview();
+    updateLivePreview();
+    showToast('All layers cleared');
+  }
+
   // SINGLE MINT BUTTON
   async function mintSingleNFT() {
-    const ordered = [];
-    for(let section of SECTIONS) if(selectedLayers[section]) ordered.push(selectedLayers[section]);
-    if(ordered.length === 0) { showToast('❌ Please select at least one layer (except Background)'); return; }
+    if(selectedLayersArray.length === 0) { showToast('❌ Please select at least one layer (except Background)'); return; }
     
     const nftName = document.getElementById('nft-name').value.trim() || "404 Punks";
     const description = document.getElementById('nft-description').value.trim();
@@ -276,7 +288,7 @@
     
     try {
       const imageData = await compositeFromSelected();
-      const attributes = buildAttributes(ordered);
+      const attributes = buildAttributes(selectedLayersArray);
       const nextNum = getNextNumber();
       const newNFT = {
         id: Date.now() + '_' + Math.random().toString(36).substr(2,6),
@@ -293,7 +305,7 @@
       saveUserNFTs();
       
       // Clear selected layers after mint
-      selectedLayers = {};
+      selectedLayersArray = [];
       renderCreateSections();
       renderCollection();
       if(previewCtx) { previewCtx.clearRect(0,0,240,240); previewCtx.fillStyle = '#0f172a'; previewCtx.fillRect(0,0,240,240); }
@@ -319,7 +331,14 @@
   }
 
   async function addLayerToFirebase(section, layer) { const updated = [...(layersBySection[section]||[]), layer]; await database.ref(`layers/${section}`).set(updated); }
-  async function deleteLayerFromFirebase(section, layerId) { const filtered = (layersBySection[section]||[]).filter(l=>String(l.id)!==String(layerId)); await database.ref(`layers/${section}`).set(filtered); for(let sec in selectedLayers) if(selectedLayers[sec]?.layerId==layerId) delete selectedLayers[sec]; renderCreateSections(); updateLivePreview(); }
+  async function deleteLayerFromFirebase(section, layerId) { 
+    const filtered = (layersBySection[section]||[]).filter(l=>String(l.id)!==String(layerId)); 
+    await database.ref(`layers/${section}`).set(filtered); 
+    // Also remove from selectedLayersArray if present
+    selectedLayersArray = selectedLayersArray.filter(l => l.layerId != layerId);
+    renderCreateSections(); 
+    updateLivePreview(); 
+  }
 
   function renderSectionsLayers() {
     const container = document.getElementById('sections-container');
@@ -350,13 +369,13 @@
       const layers = layersBySection[section] || [];
       if(!layers.length) continue;
       const isOpen = openSectionCreate === section;
-      const selected = selectedLayers[section];
-      html += `<div class="section-card rounded-xl overflow-hidden mb-3"><div onclick="App.toggleCreateSection('${section}')" class="flex justify-between items-center p-3 bg-white/50 cursor-pointer"><span class="font-raj font-bold text-blue-900">${section} ${selected ? '✓' : ''}</span><i data-lucide="chevron-down" style="width:18px" class="${isOpen?'rotate-180':''} transition"></i></div>`;
+      const selectedLayer = selectedLayersArray.find(l => l.section === section);
+      html += `<div class="section-card rounded-xl overflow-hidden mb-3"><div onclick="App.toggleCreateSection('${section}')" class="flex justify-between items-center p-3 bg-white/50 cursor-pointer"><span class="font-raj font-bold text-blue-900">${section} ${selectedLayer ? '✓' : ''}</span><i data-lucide="chevron-down" style="width:18px" class="${isOpen?'rotate-180':''} transition"></i></div>`;
       if(isOpen) {
         html += `<div class="p-3 grid grid-cols-2 sm:grid-cols-4 gap-3">`;
         layers.forEach(layer => {
-          const isSel = selected && selected.layerId === layer.id;
-          html += `<div onclick="App.selectLayer('${section}','${layer.id}','${escapeHtml(layer.value).replace(/'/g,"\\'")}','${layer.imageUrl.replace(/'/g,"\\'")}','${layer.gender}')" class="layer-item p-2 cursor-pointer ${isSel?'selected':''}"><img src="${layer.imageUrl}" class="w-full aspect-square object-contain rounded-lg bg-gray-100">${isSel ? '<div class="text-blue-600 text-center text-xs font-bold mt-1">✓ Selected</div>' : ''}<p class="text-xs text-center mt-1 font-medium">${escapeHtml(layer.value)}</p></div>`;
+          const isSel = selectedLayer && selectedLayer.layerId === layer.id;
+          html += `<div onclick="App.toggleLayerSelection('${section}','${layer.id}','${escapeHtml(layer.value).replace(/'/g,"\\'")}','${layer.imageUrl.replace(/'/g,"\\'")}','${layer.gender}')" class="layer-item p-2 cursor-pointer ${isSel?'selected':''}"><img src="${layer.imageUrl}" class="w-full aspect-square object-contain rounded-lg bg-gray-100">${isSel ? '<div class="text-blue-600 text-center text-xs font-bold mt-1">✓ Selected</div>' : ''}<p class="text-xs text-center mt-1 font-medium">${escapeHtml(layer.value)}</p></div>`;
         });
         html += `</div>`;
       }
@@ -368,17 +387,22 @@
     updateOrderPreview();
   }
 
-  function selectLayer(section, layerId, value, imageUrl, gender) { selectedLayers[section] = { section, layerId, value, imageUrl, gender }; renderCreateSections(); updateLivePreview(); }
-  function updateOrderPreview() { const div = document.getElementById('order-preview-list'); if(!div) return; const ordered = []; for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); div.innerHTML = ordered.length ? ordered.map((l,i)=>`<span class="order-tag">${i+1}. ${l.section}: ${escapeHtml(l.value)}</span>`).join('') : '<span class="text-gray-500">No layers selected</span>'; }
+  function updateOrderPreview() { 
+    const div = document.getElementById('order-preview-list'); 
+    if(!div) return; 
+    if(selectedLayersArray.length === 0) {
+      div.innerHTML = '<span class="text-gray-500">No layers selected</span>';
+      return;
+    }
+    div.innerHTML = selectedLayersArray.map((l, idx) => `<span class="order-tag">${idx+1}. ${l.section}: ${escapeHtml(l.value)}</span>`).join(''); 
+  }
   
   async function updateLivePreview() { 
     if(!previewCtx) { const can = document.getElementById('live-preview-canvas'); if(can) previewCtx = can.getContext('2d'); else return; } 
     previewCtx.clearRect(0,0,240,240); 
     previewCtx.fillStyle = '#0f172a'; 
     previewCtx.fillRect(0,0,240,240); 
-    const ordered = []; 
-    for(let s of SECTIONS) if(selectedLayers[s]) ordered.push(selectedLayers[s]); 
-    for(let item of ordered) { 
+    for(let item of selectedLayersArray) { 
       await new Promise(resolve => { 
         const img = new Image(); 
         img.crossOrigin = "Anonymous"; 
@@ -456,7 +480,7 @@
   function toggleSectionLayers(s){ openSectionLayers = openSectionLayers===s?null:s; renderSectionsLayers(); }
   function toggleCreateSection(s){ openSectionCreate = openSectionCreate===s?null:s; renderCreateSections(); }
 
-  window.App = { switchTab, addLayer, deleteLayer, selectLayer, mintSingleNFT, downloadImage, downloadJSON, deleteNFT, viewMetadata, toggleSectionLayers, toggleCreateSection };
+  window.App = { switchTab, addLayer, deleteLayer, toggleLayerSelection, mintSingleNFT, downloadImage, downloadJSON, deleteNFT, viewMetadata, toggleSectionLayers, toggleCreateSection, clearAllSelections };
   
   document.getElementById('mintButtonSingle')?.addEventListener('click', (e) => { e.preventDefault(); mintSingleNFT(); });
   
