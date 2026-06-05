@@ -668,7 +668,11 @@ function generateNFTLayers(gender, existingKeys, maxAttempts=50) {
       const available = (layersBySection[s] || []).filter(l => l.gender === 'both' || l.gender === gender);
       if (!available.length) continue;
 
-      const includeChance = s === 'Neck' ? 0.10 : 0.65;
+      const includeChance = s === 'Neck' ? 0.10
+        : s === 'Face'  ? 0.07
+        : s === 'Nose'  ? 0.04
+        : s === 'Mouth' ? 0.20
+        : 0.65;
       if (Math.random() < includeChance) {
         const picked = available[Math.floor(Math.random() * available.length)];
         pickedLayers.push({ section: s, value: picked.value, imageUrl: picked.imageUrl });
