@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,13 +54,12 @@
     .layer-item.selected .order-num { display: block; }
     .prob-badge { background: #000080; color: #ffff00; font-family: 'Press Start 2P', monospace; font-size: 7px; padding: 2px 6px; border: 1px solid #4444ff; }
     .selected-order-item { background: #d4d0c8; border: 2px outset #808080; padding: 6px 10px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; font-family: 'Press Start 2P', monospace; font-size: 7px; }
-
-    /* Per-layer quantity inputs */
     .layer-qty-box { background: #fff; border: 2px inset #808080; display: flex; flex-direction: column; gap: 2px; padding: 4px; margin-top: 4px; }
     .layer-qty-row { display: flex; align-items: center; gap: 4px; font-family: 'Press Start 2P', monospace; font-size: 6px; }
     .layer-qty-input { background: #ffffff; border: 1px inset #808080; width: 52px; padding: 2px 4px; font-family: 'Press Start 2P', monospace; font-size: 6px; text-align: center; }
     .layer-qty-input.selected-input { background: #ccddff; }
     .section-auto-prob { background: #006400; color: #ffff00; font-family: 'Press Start 2P', monospace; font-size: 6px; padding: 2px 6px; border: 1px solid #004400; margin-left: 6px; }
+    .zip-progress { background: #000080; color: #00ff00; font-family: 'Press Start 2P', monospace; font-size: 8px; padding: 8px 12px; border: 2px inset #808080; margin-top: 8px; display: none; }
   </style>
 </head>
 <body>
@@ -109,15 +109,14 @@
         <div class="win95-window" style="margin-bottom: 16px;">
           <div class="win95-titlebar" style="background: #808080;">📜 HOW IT WORKS</div>
           <div class="win95-content">
-            <div class="info-text">✓ প্রতিটি লেয়ারে আলাদা quantity দিন (কতটি NFT এই লেয়ার পাবে)</div>
-            <div class="info-text">✓ Male/Female আলাদা আলাদা quantity সেট করুন</div>
-            <div class="info-text">✓ Section-এর % অটো ক্যালকুলেট হবে layer quantity থেকে</div>
-            <div class="info-text">✓ Background + Base সবসময় থাকবে</div>
+            <div class="info-text">✓ Set individual quantity per layer (how many NFTs get this layer)</div>
+            <div class="info-text">✓ Set Male/Female quantity separately per layer</div>
+            <div class="info-text">✓ Section probability auto-calculated from layer quantities</div>
+            <div class="info-text">✓ Background + Base always included</div>
             <div class="info-text">✓ MAX 20,000 NFTs</div>
           </div>
         </div>
 
-        <!-- Mint Settings উপরে নিয়ে এলাম যাতে total count জানা যায় -->
         <div class="win95-window" style="margin-bottom:16px;">
           <div class="win95-titlebar" style="background: #808080;">⚙️ MINT SETTINGS</div>
           <div class="win95-content">
@@ -144,16 +143,14 @@
           </div>
         </div>
 
-        <!-- Section + Per-Layer Quantity -->
         <div class="win95-window" style="margin-bottom:16px;">
-          <div class="win95-titlebar" style="background:#808080;">🎲 LAYER QUANTITY (প্রতিটি লেয়ারে কতটি NFT পাবে সেট করুন)</div>
+          <div class="win95-titlebar" style="background:#808080;">🎲 LAYER QUANTITY (Set how many NFTs each layer gets)</div>
           <div class="win95-content">
-            <div class="info-text mb-2">💡 Total NFT count অনুযায়ী প্রতিটি লেয়ারের Male/Female quantity দিন। Section-এর % অটো হবে।</div>
+            <div class="info-text mb-2">💡 Set Male/Female quantity per layer based on total NFT count. Section % auto-calculates.</div>
             <div id="create-sections-container" class="space-y-3"></div>
           </div>
         </div>
 
-        <!-- Layer Order Preview -->
         <div class="win95-window" style="margin-bottom:16px;">
           <div class="win95-titlebar" style="background: #808080;">🔢 LAYER COMPOSITING ORDER (First selected = Bottom)</div>
           <div class="win95-content">
@@ -177,10 +174,11 @@
           <div class="win95-content">
             <div class="flex gap-3 flex-wrap">
               <button onclick="App.deleteAllNFTs()" class="win95-btn flex-1" style="border-color:#ff4444;color:#aa0000;">🗑️ DELETE ALL</button>
-              <button onclick="App.downloadAllPNG()" class="win95-btn flex-1">🖼️ ALL PNG</button>
-              <button onclick="App.downloadAllJSON()" class="win95-btn flex-1">📄 ALL JSON</button>
-              <button onclick="App.downloadAllAsZip()" class="win95-btn flex-1">📦 PNG+JSON</button>
+              <button onclick="App.downloadAllPNG()" class="win95-btn flex-1">🖼️ ZIP: PNGs</button>
+              <button onclick="App.downloadAllJSON()" class="win95-btn flex-1">📄 ZIP: JSONs</button>
+              <button onclick="App.downloadAllAsZip()" class="win95-btn flex-1">📦 BOTH ZIPs</button>
             </div>
+            <div id="zip-status" class="zip-progress">⏳ Building ZIP...</div>
           </div>
         </div>
       </div>
@@ -250,6 +248,13 @@ function showToast(m) {
   t.classList.remove('hidden');
   clearTimeout(window.tt);
   window.tt = setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+function setZipStatus(msg, show) {
+  const el = document.getElementById('zip-status');
+  if (!el) return;
+  el.style.display = show ? 'block' : 'none';
+  if (msg) el.innerText = msg;
 }
 
 function extractAllTraitValues(attributes) {
@@ -371,7 +376,6 @@ const database = firebase.database();
 
 let layersBySection = {};
 let selectedLayersPerSection = {};
-// Per-layer quantity: { [section]: { [layerId]: { male: N, female: N } } }
 let layerQuantity = {};
 let nfts = [], filteredNFTs = null;
 let openSectionLayers = null, openSectionCreate = null;
@@ -455,13 +459,11 @@ function getTotalNFTCount() {
   return Math.min(MAX_NFT_LIMIT, parseInt(document.getElementById('total-nft-count')?.value) || 10);
 }
 
-// Section-এর effective probability অটো ক্যালকুলেট করে layer quantity থেকে
 function calcSectionProbability(section, gender) {
   const total = getTotalNFTCount();
   const half = gender === 'male' ? Math.ceil(total / 2) : Math.floor(total / 2);
   const selected = selectedLayersPerSection[section] || [];
   if (!selected.length) return 0;
-  // Sum of qty for this gender across all selected layers in section
   let sumQty = 0;
   for (let l of selected) {
     if (l.gender === 'both' || l.gender === gender) {
@@ -473,7 +475,7 @@ function calcSectionProbability(section, gender) {
 }
 
 // ============================================================
-// LAYER SELECTION - ORDER TRACKING
+// LAYER SELECTION
 // ============================================================
 function toggleLayerSelection(section, layerId, value, imageUrl, gender) {
   let selected = selectedLayersPerSection[section];
@@ -544,7 +546,6 @@ function renderCreateSections() {
     let rankMap = {};
     allSelected.forEach((l, idx) => { rankMap[l.layerId + '_' + l.section] = idx + 1; });
 
-    // Auto probability from quantities
     const maleProb = calcSectionProbability(section, 'male');
     const femaleProb = calcSectionProbability(section, 'female');
 
@@ -552,12 +553,11 @@ function renderCreateSections() {
     let femaleLayers = layers.filter(l => l.gender === 'female');
     let bothLayers = layers.filter(l => l.gender === 'both');
 
-    function layerCard(l, genderCtx) {
+    function layerCard(l) {
       const rank = rankMap[l.id + '_' + section];
       const isSelected = selectedIds.includes(l.id);
       const mQty = getLayerQty(section, l.id, 'male');
       const fQty = getLayerQty(section, l.id, 'female');
-      // Show qty inputs only if selected and layer can have that gender
       const showMale = (l.gender === 'male' || l.gender === 'both');
       const showFemale = (l.gender === 'female' || l.gender === 'both');
       return `<div onclick="App.toggleLayerSelection('${section}','${l.id}','${escapeHtml(l.value).replace(/'/g,"\\'")}','${l.imageUrl.replace(/'/g,"\\'")}','${l.gender}')"
@@ -597,18 +597,18 @@ function renderCreateSections() {
         </div>
       </div>
       ${isOpen ? `<div style="padding:12px;">
-        <div class="info-text mb-2">📊 Total: ♂${maleTotal} Male / ♀${femaleTotal} Female NFTs. Qty = 이 layer를 받을 NFT 수</div>
+        <div class="info-text mb-2">📊 Total: ♂${maleTotal} Male / ♀${femaleTotal} Female NFTs. Qty = NFTs that get this layer</div>
         ${bothLayers.length ? `<div class="text-pixel text-[8px] mb-2">⚥ BOTH</div>
           <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; margin-bottom:15px;">
-            ${bothLayers.map(l => layerCard(l, 'both')).join('')}
+            ${bothLayers.map(l => layerCard(l)).join('')}
           </div>` : ''}
         ${maleLayers.length ? `<div class="text-pixel text-[8px] mb-2">♂ MALE</div>
           <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; margin-bottom:15px;">
-            ${maleLayers.map(l => layerCard(l, 'male')).join('')}
+            ${maleLayers.map(l => layerCard(l)).join('')}
           </div>` : ''}
         ${femaleLayers.length ? `<div class="text-pixel text-[8px] mb-2">♀ FEMALE</div>
           <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px;">
-            ${femaleLayers.map(l => layerCard(l, 'female')).join('')}
+            ${femaleLayers.map(l => layerCard(l)).join('')}
           </div>` : ''}
       </div>` : ''}
     </div>`;
@@ -666,7 +666,6 @@ async function updateLivePreview() {
   }
 }
 
-// Fast canvas composite using offscreen canvas
 async function compositeFromLayers(layers, w = 512, h = 512) {
   let canvas;
   if (typeof OffscreenCanvas !== 'undefined') {
@@ -679,7 +678,6 @@ async function compositeFromLayers(layers, w = 512, h = 512) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
 
-  // Preload all images in parallel
   const images = await Promise.all(layers.map(l => new Promise(res => {
     let img = new Image();
     img.crossOrigin = "Anonymous";
@@ -721,10 +719,8 @@ function buildNFTAttributes(layers) {
 }
 
 // ============================================================
-// GENERATIVE MINT ENGINE - PER-LAYER QUANTITY BASED
+// MINT ENGINE
 // ============================================================
-
-// Build weighted pool for a section based on layer quantity
 function buildWeightedPool(section, gender, allSelectedByOrder) {
   const sectionLayers = allSelectedByOrder.filter(l => l.section === section);
   let pool = [];
@@ -733,7 +729,6 @@ function buildWeightedPool(section, gender, allSelectedByOrder) {
     const qty = getLayerQty(section, l.layerId, gender);
     for (let i = 0; i < qty; i++) pool.push(l);
   }
-  // Shuffle pool
   for (let i = pool.length - 1; i > 0; i--) {
     let j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -743,7 +738,6 @@ function buildWeightedPool(section, gender, allSelectedByOrder) {
 
 async function startMint() {
   let total = Math.min(MAX_NFT_LIMIT, parseInt(document.getElementById('total-nft-count').value) || 1);
-
   let bgLayers = selectedLayersPerSection['Background'] || [];
   let baseLayers = selectedLayersPerSection['Base'] || [];
   if (!bgLayers.length) { showToast('⚠️ Please select Background layer!'); return; }
@@ -770,9 +764,6 @@ async function startMint() {
   }
 
   let allSelectedByOrder = getAllSelectedLayersInOrder();
-
-  // Build weighted pools per section per gender
-  // Pool index per gender: we iterate through pool in order, cycling if needed
   let pools = {};
   let poolIdx = {};
   for (let section of SECTIONS_ORDER) {
@@ -783,7 +774,6 @@ async function startMint() {
     }
   }
 
-  // Pick from pool by index (sequential, not random), cycling if needed
   function pickFromPool(section, gender) {
     const key = section + '_' + gender;
     const pool = pools[key];
@@ -793,7 +783,6 @@ async function startMint() {
     return item;
   }
 
-  // For sections with empty quantity pools, fallback to random from selected
   function pickRandom(section, gender) {
     const sectionLayers = allSelectedByOrder.filter(l => l.section === section && (l.gender === 'both' || l.gender === gender));
     if (!sectionLayers.length) return null;
@@ -807,51 +796,34 @@ async function startMint() {
 
   let newNFTs = [];
   let startTime = Date.now();
-  // Batch size for parallel compositing
   const BATCH = 5;
 
   for (let idx = 0; idx < order.length; idx += BATCH) {
     const batchEnd = Math.min(idx + BATCH, order.length);
     const batchGenders = order.slice(idx, batchEnd);
 
-    // Build layer sets for each NFT in batch
     let batchLayerSets = batchGenders.map((gender) => {
       let pickedLayersMap = {};
-
-      // Background
       let bgPicked = hasQtyForSection('Background', gender) ? pickFromPool('Background', gender) : pickRandom('Background', gender);
       if (bgPicked) pickedLayersMap['Background'] = bgPicked;
-
-      // Base
       let basePicked = hasQtyForSection('Base', gender) ? pickFromPool('Base', gender) : pickRandom('Base', gender);
       if (basePicked) pickedLayersMap['Base'] = basePicked;
-
       let baseValue = pickedLayersMap['Base'] ? pickedLayersMap['Base'].value : null;
 
       for (let section of SECTIONS_ORDER) {
         if (section === 'Background' || section === 'Base') continue;
         if (isSectionBlockedForBase(section, baseValue)) continue;
-
         let picked = null;
         if (hasQtyForSection(section, gender)) {
-          // Use quantity-based: pick from pool deterministically
           const key = section + '_' + gender;
           const pool = pools[key];
-          // Check if we still have quota (pool length = total qty)
-          if (poolIdx[key] < pool.length) {
-            picked = pool[poolIdx[key]];
-            poolIdx[key]++;
-          }
-          // else: this section's quota exhausted, skip
+          if (poolIdx[key] < pool.length) { picked = pool[poolIdx[key]]; poolIdx[key]++; }
         } else {
-          // No qty set: use probability-based random (fallback)
           const maleProb = calcSectionProbability(section, 'male');
           const femaleProb = calcSectionProbability(section, 'female');
           const prob = gender === 'male' ? maleProb : femaleProb;
           const useProb = prob > 0 ? prob : 50;
-          if (Math.random() * 100 < useProb) {
-            picked = pickRandom(section, gender);
-          }
+          if (Math.random() * 100 < useProb) picked = pickRandom(section, gender);
         }
         if (picked) pickedLayersMap[section] = picked;
       }
@@ -865,7 +837,6 @@ async function startMint() {
       return finalLayers;
     });
 
-    // Composite all in batch in parallel
     let batchImages = await Promise.all(batchLayerSets.map(layers => compositeFromLayers(layers)));
 
     for (let bi = 0; bi < batchGenders.length; bi++) {
@@ -874,7 +845,6 @@ async function startMint() {
       const finalLayers = batchLayerSets[bi];
       const imgData = batchImages[bi];
       const attributes = buildNFTAttributes(finalLayers);
-
       newNFTs.push({
         id: Date.now() + '_' + Math.random().toString(36).substr(2, 8) + '_' + nftIdx,
         name: `${prefix}${nftIdx + 1}`,
@@ -887,7 +857,6 @@ async function startMint() {
       });
     }
 
-    // Update progress
     const done = Math.min(idx + BATCH, order.length);
     const percent = Math.round((done / order.length) * 100);
     progText.innerText = `MINTING... ${percent}%`;
@@ -899,7 +868,6 @@ async function startMint() {
       let remaining = (order.length - done) / rate;
       progEta.innerText = `⏱ ETA: ${Math.round(remaining)}s`;
     }
-
     await new Promise(r => setTimeout(r, 1));
   }
 
@@ -912,6 +880,130 @@ async function startMint() {
   if (isIndexLoaded) updateAllMatchBadges();
 }
 
+// ============================================================
+// ZIP DOWNLOAD HELPERS
+// ============================================================
+
+// Convert base64 dataURL to Uint8Array for JSZip
+function dataURLtoUint8Array(dataURL) {
+  const base64 = dataURL.split(',')[1];
+  const binary = atob(base64);
+  const arr = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return arr;
+}
+
+async function downloadAllPNG() {
+  if (!nfts.length) { showToast('No NFTs found!'); return; }
+  setZipStatus(`⏳ Building PNG zip (${nfts.length} files)...`, true);
+  showToast('⏳ Building images.zip...');
+  await new Promise(r => setTimeout(r, 10));
+
+  const zip = new JSZip();
+  for (let i = 0; i < nfts.length; i++) {
+    const serial = i + 1;
+    const pngData = dataURLtoUint8Array(nfts[i].image);
+    zip.file(`${serial}.png`, pngData);
+    if (i % 50 === 0) {
+      setZipStatus(`⏳ Packing PNG ${i+1}/${nfts.length}...`, true);
+      await new Promise(r => setTimeout(r, 1));
+    }
+  }
+
+  setZipStatus('⚙️ Compressing...', true);
+  await new Promise(r => setTimeout(r, 5));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'nfts_images.zip';
+  a.click();
+  URL.revokeObjectURL(url);
+  setZipStatus('', false);
+  showToast(`✅ nfts_images.zip downloaded! (${nfts.length} PNGs)`);
+}
+
+async function downloadAllJSON() {
+  if (!nfts.length) { showToast('No NFTs found!'); return; }
+  setZipStatus(`⏳ Building JSON zip (${nfts.length} files)...`, true);
+  showToast('⏳ Building metadata.zip...');
+  await new Promise(r => setTimeout(r, 10));
+
+  const zip = new JSZip();
+  for (let i = 0; i < nfts.length; i++) {
+    const serial = i + 1;
+    const meta = { name: nfts[i].name, description: nfts[i].description, attributes: nfts[i].attributes };
+    zip.file(`${serial}.json`, JSON.stringify(meta, null, 2));
+    if (i % 200 === 0) {
+      setZipStatus(`⏳ Packing JSON ${i+1}/${nfts.length}...`, true);
+      await new Promise(r => setTimeout(r, 1));
+    }
+  }
+
+  setZipStatus('⚙️ Compressing...', true);
+  await new Promise(r => setTimeout(r, 5));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'nfts_metadata.zip';
+  a.click();
+  URL.revokeObjectURL(url);
+  setZipStatus('', false);
+  showToast(`✅ nfts_metadata.zip downloaded! (${nfts.length} JSONs)`);
+}
+
+async function downloadAllAsZip() {
+  if (!nfts.length) { showToast('No NFTs found!'); return; }
+
+  // PNG zip
+  setZipStatus(`⏳ Building images ZIP (${nfts.length} PNGs)...`, true);
+  showToast('⏳ Building nfts_images.zip...');
+  await new Promise(r => setTimeout(r, 10));
+  const pngZip = new JSZip();
+  for (let i = 0; i < nfts.length; i++) {
+    pngZip.file(`${i+1}.png`, dataURLtoUint8Array(nfts[i].image));
+    if (i % 50 === 0) {
+      setZipStatus(`⏳ Packing PNG ${i+1}/${nfts.length}...`, true);
+      await new Promise(r => setTimeout(r, 1));
+    }
+  }
+  setZipStatus('⚙️ Compressing images...', true);
+  const pngBlob = await pngZip.generateAsync({ type: 'blob', compression: 'STORE' });
+  const pngUrl = URL.createObjectURL(pngBlob);
+  const a1 = document.createElement('a');
+  a1.href = pngUrl; a1.download = 'nfts_images.zip'; a1.click();
+  URL.revokeObjectURL(pngUrl);
+
+  await new Promise(r => setTimeout(r, 500));
+
+  // JSON zip
+  setZipStatus(`⏳ Building metadata ZIP (${nfts.length} JSONs)...`, true);
+  showToast('⏳ Building nfts_metadata.zip...');
+  await new Promise(r => setTimeout(r, 10));
+  const jsonZip = new JSZip();
+  for (let i = 0; i < nfts.length; i++) {
+    const meta = { name: nfts[i].name, description: nfts[i].description, attributes: nfts[i].attributes };
+    jsonZip.file(`${i+1}.json`, JSON.stringify(meta, null, 2));
+    if (i % 200 === 0) {
+      setZipStatus(`⏳ Packing JSON ${i+1}/${nfts.length}...`, true);
+      await new Promise(r => setTimeout(r, 1));
+    }
+  }
+  setZipStatus('⚙️ Compressing metadata...', true);
+  const jsonBlob = await jsonZip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  const jsonUrl = URL.createObjectURL(jsonBlob);
+  const a2 = document.createElement('a');
+  a2.href = jsonUrl; a2.download = 'nfts_metadata.zip'; a2.click();
+  URL.revokeObjectURL(jsonUrl);
+
+  setZipStatus('', false);
+  showToast(`✅ Both ZIPs downloaded! ${nfts.length} PNGs + ${nfts.length} JSONs`);
+}
+
+// ============================================================
+// COLLECTION RENDER
+// ============================================================
 function renderCollection() {
   let container = document.getElementById('nft-list');
   let empty = document.getElementById('nft-empty');
@@ -938,10 +1030,7 @@ function renderCollection() {
         <button onclick="App.deleteSingleNFT('${nft.id}')" class="win95-btn" style="padding:4px; font-size:7px; flex:1; border-color:#ff4444;">DEL</button>
       </div>
     </div>`).join('');
-  if (isIndexLoaded) {
-    // Batch match badge updates with RAF
-    requestAnimationFrame(() => updateAllMatchBadges());
-  }
+  if (isIndexLoaded) requestAnimationFrame(() => updateAllMatchBadges());
 }
 
 function searchNFTs() {
@@ -980,71 +1069,9 @@ async function deleteSingleNFT(id) {
   }
 }
 
-async function downloadAllPNG() {
-  if (!nfts.length) { showToast('No NFTs found!'); return; }
-  showToast(`⬇ Downloading ${nfts.length} PNGs...`);
-  for (let i = 0; i < nfts.length; i++) {
-    let a = document.createElement('a');
-    a.href = nfts[i].image;
-    a.download = `${i + 1}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    await new Promise(r => setTimeout(r, 80));
-  }
-  showToast(`✅ ${nfts.length} PNG download started!`);
-}
-
-async function downloadAllJSON() {
-  if (!nfts.length) { showToast('No NFTs found!'); return; }
-  showToast(`⬇ Downloading ${nfts.length} JSONs...`);
-  for (let i = 0; i < nfts.length; i++) {
-    let meta = { name: nfts[i].name, description: nfts[i].description, attributes: nfts[i].attributes };
-    let blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' });
-    let url = URL.createObjectURL(blob);
-    let a = document.createElement('a');
-    a.href = url;
-    a.download = `${i + 1}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    await new Promise(r => setTimeout(r, 80));
-  }
-  showToast(`✅ ${nfts.length} JSON download started!`);
-}
-
-async function downloadAllAsZip() {
-  if (!nfts.length) { showToast('No NFTs found!'); return; }
-  showToast(`⬇ Downloading ${nfts.length} PNG + JSON...`);
-  for (let i = 0; i < nfts.length; i++) {
-    let serial = i + 1;
-    let a = document.createElement('a');
-    a.href = nfts[i].image;
-    a.download = `${serial}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    await new Promise(r => setTimeout(r, 40));
-
-    let meta = { name: nfts[i].name, description: nfts[i].description, attributes: nfts[i].attributes };
-    let blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' });
-    let url = URL.createObjectURL(blob);
-    let b = document.createElement('a');
-    b.href = url;
-    b.download = `${serial}.json`;
-    document.body.appendChild(b);
-    b.click();
-    document.body.removeChild(b);
-    URL.revokeObjectURL(url);
-    await new Promise(r => setTimeout(r, 40));
-  }
-  showToast('✅ Download started!');
-}
-
 function downloadSingleImage(id, serial) {
   let n = nfts.find(x => x.id == id);
-  if (n) { let a = document.createElement('a'); a.href = n.image; a.download = `${serial || n.name.replace(/[^a-z0-9]/gi,'_')}.png`; a.click(); showToast('PNG SAVED'); }
+  if (n) { let a = document.createElement('a'); a.href = n.image; a.download = `${serial}.png`; a.click(); showToast('PNG SAVED'); }
 }
 
 function downloadSingleJSON(id, serial) {
@@ -1054,7 +1081,7 @@ function downloadSingleJSON(id, serial) {
     let blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' });
     let a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${serial || n.name.replace(/[^a-z0-9]/gi,'_')}.json`;
+    a.download = `${serial}.json`;
     a.click();
     showToast('JSON SAVED');
   }
@@ -1085,7 +1112,6 @@ function switchTab(tab) {
   if (tab === 'collection') renderCollection();
 }
 
-// FAST EDIT: patch single NFT without re-compositing full list
 async function viewNFTDetails(id) {
   let nft = nfts.find(n => n.id === id);
   if (!nft) return;
@@ -1117,7 +1143,6 @@ async function viewNFTDetails(id) {
       </div>
     </div></div>`;
   document.body.appendChild(modal);
-  // Draw on modal canvas directly (fast - no data URL roundtrip)
   const mc = document.getElementById('modal-canvas-' + id);
   if (mc) {
     const mctx = mc.getContext('2d');
@@ -1142,14 +1167,11 @@ async function editNFTLayer(nftId, layerIndex, direction) {
   else return;
   newLayers.forEach((l, idx) => l.selectionOrder = idx);
   nft.layers = newLayers;
-  // Fast re-composite
   let imgData = await compositeFromLayers(newLayers);
   nft.image = imgData;
   nft.attributes = buildNFTAttributes(newLayers);
-  // Update card image inline without full re-render
   const cardImg = document.querySelector(`#card-${nftId} img`);
   if (cardImg) cardImg.src = imgData;
-  // Save async
   updateNFTsInFirebase();
   showToast('LAYER MOVED');
   document.getElementById('nft-modal-' + nftId)?.remove();
