@@ -501,18 +501,26 @@ function updateStats() {
 }
 
 // ============================================================
-// FIREBASE LAYER MANAGEMENT
+// FIREBASE LAYER MANAGEMENT (Instant local update + background sync)
 // ============================================================
 async function addLayerToFirebase(section, layer) {
-  let arr = [...(layersBySection[section] || []), layer];
-  await database.ref(`layers/${section}`).set(arr);
-  showToast(`ADDED: ${layer.value}`);
+  // 1. Instant local update — UI responds immediately
+  layersBySection[section] = [...(layersBySection[section] || []), layer];
+  renderSections();
+  updateStats();
+  showToast(`✅ ADDED: ${layer.value}`);
+  // 2. Background Firebase sync (no await — non-blocking)
+  database.ref(`layers/${section}`).set(layersBySection[section]).catch(e => console.warn('Firebase sync:', e));
 }
 
 async function deleteLayerFromFirebase(section, id) {
-  let filtered = (layersBySection[section] || []).filter(l => String(l.id) !== String(id));
-  await database.ref(`layers/${section}`).set(filtered);
-  showToast('LAYER DELETED');
+  // 1. Instant local update
+  layersBySection[section] = (layersBySection[section] || []).filter(l => String(l.id) !== String(id));
+  renderSections();
+  updateStats();
+  showToast('🗑️ LAYER DELETED');
+  // 2. Background Firebase sync
+  database.ref(`layers/${section}`).set(layersBySection[section]).catch(e => console.warn('Firebase sync:', e));
 }
 
 async function addLayer() {
@@ -525,10 +533,14 @@ async function addLayer() {
   if (imgUrl.includes('github.com') && !imgUrl.includes('raw.githubusercontent.com'))
     imgUrl = imgUrl.replace('github.com','raw.githubusercontent.com').replace('/blob/','/');
   let newLayer = { id: Date.now()+'_'+Math.random().toString(36).substr(2,6), value: val, imageUrl: imgUrl, gender };
+  // Validate image first, then add instantly
   let test = new Image();
   test.onload = () => addLayerToFirebase(section, newLayer);
-  test.onerror = () => showToast('BAD IMAGE URL');
+  test.onerror = () => showToast('❌ BAD IMAGE URL');
   test.src = imgUrl;
+  // Clear inputs immediately for faster workflow
+  document.getElementById('github-url').value = '';
+  document.getElementById('layer-value').value = '';
 }
 
 function listenFirebase() {
@@ -650,13 +662,13 @@ function generateNFTLayers(gender, existingKeys, maxAttempts=50) {
     pickedLayers.push({ section: 'Base', value: base.value, imageUrl: base.imageUrl });
 
     // Optional layers - each section randomly included/excluded
+    // Neck: only 10% chance | All others: 65% chance
     for (let s of SECTIONS_ORDER) {
       if (s === 'Background' || s === 'Base') continue;
       const available = (layersBySection[s] || []).filter(l => l.gender === 'both' || l.gender === gender);
       if (!available.length) continue;
 
-      // Random chance to include this section (50-90% based on section importance)
-      const includeChance = 0.65;
+      const includeChance = s === 'Neck' ? 0.10 : 0.65;
       if (Math.random() < includeChance) {
         const picked = available[Math.floor(Math.random() * available.length)];
         pickedLayers.push({ section: s, value: picked.value, imageUrl: picked.imageUrl });
