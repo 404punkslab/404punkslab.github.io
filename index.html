@@ -116,31 +116,12 @@
       <!-- ===== CREATE NFT TAB ===== -->
       <div id="panel-create" class="hidden">
 
-        <!-- LAYER ORDER INFO -->
-        <div class="win95-window" style="margin-bottom:16px;">
-          <div class="win95-titlebar" style="background:#006400;">📐 LAYER STACK ORDER (Auto-Applied)</div>
-          <div class="win95-content">
-            <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-              <span class="layer-order-badge">1.BG</span>→
-              <span class="layer-order-badge">2.BASE</span>→
-              <span class="layer-order-badge">3.NOSE</span>→
-              <span class="layer-order-badge">4.FACE</span>→
-              <span class="layer-order-badge">5.NECK</span>→
-              <span class="layer-order-badge">6.MOUTH</span>→
-              <span class="layer-order-badge">7.HEAD</span>→
-              <span class="layer-order-badge">8.EYES</span>→
-              <span class="layer-order-badge">9.BEARD</span>→
-              <span class="layer-order-badge">10.ACC</span>→
-              <span class="layer-order-badge">11.EAR</span>
-            </div>
-            <div class="info-text mt-2">✓ Background + Base: প্রতিটি NFT-তে অবশ্যই থাকবে | ✓ Male লেয়ার Female NFT-তে যাবে না | ✓ Duplicate NFT স্বয়ংক্রিয় রিমুভ</div>
-          </div>
-        </div>
+        <!-- LAYER ORDER INFO - HIDDEN -->
 
         <!-- SUPER MINT BOX -->
         <div class="big-mint-box">
           <div style="font-family:'Press Start 2P',monospace; font-size:12px; color:#ffff00; margin-bottom:12px;">🚀 SUPER FAST NFT GENERATOR</div>
-          <div style="font-family:'Press Start 2P',monospace; font-size:8px; color:#aaaaff; margin-bottom:16px;">সংখ্যা দাও → MINT চাপো → ২০-৩০ সেকেন্ডে তৈরি!</div>
+          <div style="font-family:'Press Start 2P',monospace; font-size:8px; color:#aaaaff; margin-bottom:16px;">Enter count → Hit MINT → Done in 20-30 seconds!</div>
           <div style="display:flex; gap:12px; align-items:flex-end; justify-content:center; flex-wrap:wrap;">
             <div>
               <div style="font-family:'Press Start 2P',monospace; font-size:8px; color:#ccccff; margin-bottom:8px;">TOTAL NFTs</div>
@@ -196,7 +177,7 @@
           <div class="win95-titlebar" style="background: #808080;">🔍 SEARCH NFTs</div>
           <div class="win95-content">
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-              <input type="text" id="search-range" placeholder="555-1500 বা single নম্বর" class="search-input" style="flex:2;">
+              <input type="text" id="search-range" placeholder="e.g. 555-1500 or single number" class="search-input" style="flex:2;">
               <button onclick="App.searchNFTs()" class="win95-btn">🔍 SEARCH</button>
               <button onclick="App.clearSearch()" class="win95-btn">🗑️ CLEAR</button>
             </div>
@@ -539,7 +520,7 @@ async function addLayer() {
   let val = document.getElementById('layer-value').value.trim();
   let section = document.getElementById('layer-section').value;
   let gender = document.querySelector('input[name="layer-gender"]:checked').value;
-  if (!url || !val) { showToast('URL + VALUE দরকার'); return; }
+  if (!url || !val) { showToast('URL + VALUE required'); return; }
   let imgUrl = url;
   if (imgUrl.includes('github.com') && !imgUrl.includes('raw.githubusercontent.com'))
     imgUrl = imgUrl.replace('github.com','raw.githubusercontent.com').replace('/blob/','/');
@@ -706,8 +687,8 @@ async function startMint() {
   // Validate layers
   const bgCount = (layersBySection['Background'] || []).length;
   const baseCount = (layersBySection['Base'] || []).length;
-  if (!bgCount) { showToast('⚠️ Background layer নেই! Layers Tab-এ যোগ করুন।'); return; }
-  if (!baseCount) { showToast('⚠️ Base layer নেই! Layers Tab-এ যোগ করুন।'); return; }
+  if (!bgCount) { showToast('⚠️ No Background layer! Add one in the Layers tab.'); return; }
+  if (!baseCount) { showToast('⚠️ No Base layer! Add one in the Layers tab.'); return; }
 
   const btn = document.getElementById('bulk-mint-btn');
   btn.disabled = true;
@@ -833,7 +814,7 @@ async function startMint() {
     backupToFirebase(); // Async background backup
 
     renderCollection();
-    showToast(`✅ ${newNFTs.length} NFTs তৈরি হয়েছে! (${skippedDuplicates} duplicates skipped)`);
+    showToast(`✅ ${newNFTs.length} NFTs generated! (${skippedDuplicates} duplicates skipped)`);
     progText.innerText = `✅ DONE! ${newNFTs.length} NFTs`;
     progEta.innerText = `Total time: ${Math.round((Date.now() - startTime) / 1000)}s`;
 
@@ -925,7 +906,7 @@ function renderCollection() {
   const displayNFTs = filteredNFTs || nfts;
   empty.classList.toggle('hidden', displayNFTs.length > 0);
   countDiv.innerHTML = displayNFTs.length
-    ? `<div class="order-tag">📊 ${displayNFTs.length} / ${nfts.length} NFTs | 💾 localStorage</div>`
+    ? `<div class="order-tag">📊 ${displayNFTs.length} / ${nfts.length} NFTs | 💾 Local Storage</div>`
     : '';
   if (!displayNFTs.length) { container.innerHTML = ''; return; }
 
@@ -975,7 +956,7 @@ function searchNFTs() {
 function clearSearch() { filteredNFTs = null; document.getElementById('search-range').value = ''; renderCollection(); }
 
 async function deleteAllNFTs() {
-  if (confirm('⚠️ ALL NFTs delete করবেন?')) {
+  if (confirm('⚠️ Delete ALL NFTs?')) {
     nfts = [];
     saveNFTsLocal();
     renderCollection();
