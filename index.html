@@ -238,9 +238,9 @@
 <div id="toast" class="hidden"></div>
 
 <!-- ADD LAYER TO NFT MODAL -->
-<div id="add-layer-modal" class="hidden" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:20000;">
+<div id="add-layer-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;z-index:20000;">
   <div class="win95-window" style="width:90%;max-width:400px;">
-    <div class="win95-titlebar"><span>➕ ADD LAYER TO NFT</span><button onclick="document.getElementById('add-layer-modal').classList.add('hidden')">✕</button></div>
+    <div class="win95-titlebar"><span>➕ ADD LAYER TO NFT</span><button onclick="document.getElementById('add-layer-modal').style.display='none'">✕</button></div>
     <div class="win95-content">
       <div class="text-pixel text-[8px] mb-2">SECTION:</div>
       <select id="add-layer-section" class="win95-select w-full mb-2">
@@ -254,7 +254,7 @@
       <div class="text-pixel text-[8px] mb-2">SELECT LAYER:</div>
       <div id="add-layer-list" style="max-height:250px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;"></div>
       <div class="mt-3 flex gap-2">
-        <button onclick="document.getElementById('add-layer-modal').classList.add('hidden')" class="win95-btn flex-1">CANCEL</button>
+        <button onclick="document.getElementById('add-layer-modal').style.display='none'" class="win95-btn flex-1">CANCEL</button>
       </div>
     </div>
   </div>
@@ -1118,11 +1118,11 @@ function openAddLayerModal(nftId) {
       </div>`).join('');
   };
 
-  document.getElementById('add-layer-modal').classList.remove('hidden');
+  document.getElementById('add-layer-modal').style.display = 'flex';
 }
 
 async function applyLayerToNFT(nftId, section, value, imageUrl, layerId) {
-  document.getElementById('add-layer-modal').classList.add('hidden');
+  document.getElementById('add-layer-modal').style.display = 'none';
   let nft = nfts.find(n => n.id === nftId);
   if (!nft) return;
 
