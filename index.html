@@ -503,14 +503,22 @@ function updateStats() {
 // ============================================================
 // FIREBASE LAYER MANAGEMENT (Instant local update + background sync)
 // ============================================================
+function toCleanArray(section) {
+  // Always ensure it's a plain array before saving to Firebase
+  return (layersBySection[section] || []).filter(Boolean).map(l => ({
+    id: l.id, value: l.value, imageUrl: l.imageUrl, gender: l.gender
+  }));
+}
+
 async function addLayerToFirebase(section, layer) {
   // 1. Instant local update — UI responds immediately
   layersBySection[section] = [...(layersBySection[section] || []), layer];
   renderSections();
   updateStats();
   showToast(`✅ ADDED: ${layer.value}`);
-  // 2. Background Firebase sync (no await — non-blocking)
-  database.ref(`layers/${section}`).set(layersBySection[section]).catch(e => console.warn('Firebase sync:', e));
+  // 2. Background Firebase sync
+  const cleanArr = toCleanArray(section);
+  database.ref(`layers/${section}`).set(cleanArr).catch(e => console.warn('Firebase sync:', e));
 }
 
 async function deleteLayerFromFirebase(section, id) {
@@ -520,7 +528,8 @@ async function deleteLayerFromFirebase(section, id) {
   updateStats();
   showToast('🗑️ LAYER DELETED');
   // 2. Background Firebase sync
-  database.ref(`layers/${section}`).set(layersBySection[section]).catch(e => console.warn('Firebase sync:', e));
+  const cleanArr = toCleanArray(section);
+  database.ref(`layers/${section}`).set(cleanArr).catch(e => console.warn('Firebase sync:', e));
 }
 
 async function addLayer() {
@@ -544,15 +553,35 @@ async function addLayer() {
 }
 
 function listenFirebase() {
+  showToast('🔄 Connecting to Firebase...');
   database.ref('layers').on('value', snap => {
     let d = snap.val();
-    if (d) {
-      for (let s of SECTIONS_ORDER) layersBySection[s] = d[s] || [];
+    let totalFound = 0;
+
+    if (d && typeof d === 'object') {
+      for (let s of SECTIONS_ORDER) {
+        let raw = d[s];
+        if (!raw) { layersBySection[s] = []; continue; }
+        // Firebase may return object {0:{...}, 1:{...}} or array
+        if (Array.isArray(raw)) {
+          layersBySection[s] = raw.filter(Boolean);
+        } else if (typeof raw === 'object') {
+          layersBySection[s] = Object.values(raw).filter(Boolean);
+        } else {
+          layersBySection[s] = [];
+        }
+        totalFound += layersBySection[s].length;
+      }
+      showToast(`✅ ${totalFound} layers loaded!`);
     } else {
       for (let s of SECTIONS_ORDER) layersBySection[s] = [];
+      showToast('⚠️ No layers found in Firebase');
     }
     renderSections();
     updateStats();
+  }, err => {
+    showToast('❌ Firebase error: ' + err.message);
+    console.error('Firebase error:', err);
   });
 }
 
@@ -668,10 +697,12 @@ function generateNFTLayers(gender, existingKeys, maxAttempts=50) {
       const available = (layersBySection[s] || []).filter(l => l.gender === 'both' || l.gender === gender);
       if (!available.length) continue;
 
-      const includeChance = s === 'Neck' ? 0.10
-        : s === 'Face'  ? 0.07
-        : s === 'Nose'  ? 0.04
-        : s === 'Mouth' ? 0.20
+      const includeChance = s === 'Neck'      ? 0.10
+        : s === 'Face'      ? 0.07
+        : s === 'Nose'      ? 0.04
+        : s === 'Mouth'     ? 0.16
+        : s === 'Ear'       ? 0.40
+        : s === 'Accessory' ? 0.55
         : 0.65;
       if (Math.random() < includeChance) {
         const picked = available[Math.floor(Math.random() * available.length)];
@@ -912,9 +943,13 @@ async function downloadAllJSON() {
 }
 
 // ============================================================
-// COLLECTION RENDER
+// COLLECTION RENDER — Virtual Scroll (loads all 20k, shows in chunks)
 // ============================================================
+let vsPage = 0;
+const VS_PAGE_SIZE = 50;
+
 function renderCollection() {
+  vsPage = 0;
   const container = document.getElementById('nft-list');
   const empty = document.getElementById('nft-empty');
   const countDiv = document.getElementById('nft-count');
@@ -926,33 +961,62 @@ function renderCollection() {
     : '';
   if (!displayNFTs.length) { container.innerHTML = ''; return; }
 
-  // Virtualize large collections - show max 200 at a time
-  const MAX_SHOW = 200;
-  const showing = displayNFTs.slice(0, MAX_SHOW);
+  container.innerHTML = '';
+  // Remove old sentinel
+  document.getElementById('vs-sentinel')?.remove();
 
-  container.innerHTML = showing.map((nft, idx) => `
-    <div class="nft-card" style="padding:10px;" id="card-${nft.id}">
-      <div style="aspect-ratio:1; background:#fff; margin-bottom:8px; border:2px inset #808080;">
+  // Render first page
+  renderVSPage(container, displayNFTs);
+
+  // Add scroll sentinel for infinite loading
+  const sentinel = document.createElement('div');
+  sentinel.id = 'vs-sentinel';
+  sentinel.style.cssText = 'height:2px;width:100%;grid-column:1/-1;';
+  container.parentElement.appendChild(sentinel);
+
+  // Observe sentinel
+  if (window._vsObserver) window._vsObserver.disconnect();
+  window._vsObserver = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) renderVSPage(container, displayNFTs);
+  }, { rootMargin: '400px' });
+  window._vsObserver.observe(sentinel);
+}
+
+function renderVSPage(container, displayNFTs) {
+  const start = vsPage * VS_PAGE_SIZE;
+  if (start >= displayNFTs.length) return;
+  const end = Math.min(start + VS_PAGE_SIZE, displayNFTs.length);
+  const frag = document.createDocumentFragment();
+
+  for (let idx = start; idx < end; idx++) {
+    const nft = displayNFTs[idx];
+    const realSerial = (filteredNFTs ? nfts.indexOf(nft) : idx) + 1;
+    const div = document.createElement('div');
+    div.className = 'nft-card';
+    div.id = `card-${nft.id}`;
+    div.style.padding = '10px';
+    div.innerHTML = `
+      <div style="aspect-ratio:1;background:#fff;margin-bottom:8px;border:2px inset #808080;">
         <img src="${nft.image}" style="width:100%;height:100%;object-fit:contain;" loading="lazy">
       </div>
-      <div class="text-pixel" style="font-size:8px; text-align:center;">${escapeHtml(nft.name)}</div>
-      <div style="font-family:'Press Start 2P',monospace; font-size:6px; text-align:center; color:#808080;">${nft.gender || ''} | ${(nft.layers||[]).length} layers</div>
+      <div class="text-pixel" style="font-size:8px;text-align:center;">${escapeHtml(nft.name)}</div>
+      <div style="font-family:'Press Start 2P',monospace;font-size:6px;text-align:center;color:#808080;">${nft.gender||''} | ${(nft.layers||[]).length} layers</div>
       <div id="match-badge-${nft.id}">${isIndexLoaded ? '<div class="match-badge-loading">🔍...</div>' : '<div class="match-badge-loading">📡 load index</div>'}</div>
-      <div style="display:flex; gap:4px; margin-top:6px; flex-wrap:wrap;">
-        <button onclick="App.viewNFTDetails('${nft.id}')" class="win95-btn" style="padding:3px; font-size:6px; flex:1;">✏️ EDIT</button>
-        <button onclick="App.downloadSingleImage('${nft.id}',${idx+1})" class="win95-btn" style="padding:3px; font-size:6px; flex:1;">PNG</button>
-        <button onclick="App.downloadSingleJSON('${nft.id}',${idx+1})" class="win95-btn" style="padding:3px; font-size:6px; flex:1;">JSON</button>
-        <button onclick="App.deleteSingleNFT('${nft.id}')" class="win95-btn" style="padding:3px; font-size:6px; border-color:#ff4444;">✕</button>
-      </div>
-    </div>`).join('');
-
-  if (displayNFTs.length > MAX_SHOW) {
-    container.innerHTML += `<div style="grid-column:1/-1; text-align:center; font-family:'Press Start 2P',monospace; font-size:8px; padding:20px; color:#000080;">
-      ⚠️ Showing first ${MAX_SHOW} of ${displayNFTs.length}. Use search to find specific NFTs.
-    </div>`;
+      <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
+        <button onclick="App.viewNFTDetails('${nft.id}')" class="win95-btn" style="padding:3px;font-size:6px;flex:1;">✏️ EDIT</button>
+        <button onclick="App.downloadSingleImage('${nft.id}',${realSerial})" class="win95-btn" style="padding:3px;font-size:6px;flex:1;">PNG</button>
+        <button onclick="App.downloadSingleJSON('${nft.id}',${realSerial})" class="win95-btn" style="padding:3px;font-size:6px;flex:1;">JSON</button>
+        <button onclick="App.deleteSingleNFT('${nft.id}')" class="win95-btn" style="padding:3px;font-size:6px;border-color:#ff4444;">✕</button>
+      </div>`;
+    frag.appendChild(div);
   }
+  container.appendChild(frag);
+  vsPage++;
 
-  if (isIndexLoaded) requestAnimationFrame(() => updateAllMatchBadges());
+  // Update match badges for this page only
+  if (isIndexLoaded) {
+    for (let idx = start; idx < end; idx++) updateMatchBadgeForNFT(displayNFTs[idx]);
+  }
 }
 
 function searchNFTs() {
@@ -1026,19 +1090,7 @@ async function viewNFTDetails(id) {
     ? `<div style="background:#000080;color:#ffff00;border:2px solid #4444ff;padding:8px;margin-bottom:10px;font-family:'Press Start 2P',monospace;font-size:7px;">🎯 MATCH (${matches.length}): ${matches.slice(0,8).map(n=>'#'+n).join(', ')}${matches.length>8?' +more':''}</div>`
     : '';
 
-  let layersHtml = (nft.layers || []).map((l, idx) =>
-    `<div class="layer-row">
-      <div style="display:flex;align-items:center;gap:6px;">
-        <img src="${l.imageUrl}" style="width:32px;height:32px;object-fit:contain;border:1px solid #808080;">
-        <span style="font-family:'Press Start 2P',monospace;font-size:7px;">${idx+1}. ${l.section}: ${escapeHtml(l.value)}</span>
-      </div>
-      <div style="display:flex;gap:4px;">
-        <button onclick="App.editNFTLayer('${id}',${idx},'up')" class="move-btn">▲</button>
-        <button onclick="App.editNFTLayer('${id}',${idx},'down')" class="move-btn">▼</button>
-        <button onclick="App.deleteNFTLayer('${id}',${idx})" class="move-btn" style="border-color:#ff4444;color:#aa0000;">✕</button>
-      </div>
-    </div>`
-  ).join('');
+  let layersHtml = buildLayersListHTML(nft);
 
   // Build add-layer section selector
   const sectionOpts = SECTIONS_ORDER.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -1049,7 +1101,7 @@ async function viewNFTDetails(id) {
       <canvas id="modal-canvas-${id}" width="256" height="256" style="width:100%;margin-bottom:10px;border:3px outset #808080;display:block;"></canvas>
       ${matchHtml}
       <div style="font-family:'Press Start 2P',monospace;font-size:8px;margin-bottom:8px;">LAYERS (bottom→top)</div>
-      <div style="max-height:220px;overflow:auto;">${layersHtml}</div>
+      <div class="layers-list" style="max-height:220px;overflow:auto;">${layersHtml}</div>
 
       <!-- ADD LAYER -->
       <div style="margin-top:10px;background:#d4d0c8;border:2px inset #808080;padding:8px;">
@@ -1118,47 +1170,83 @@ function openAddLayerModal(nftId) {
   document.getElementById('add-layer-modal').style.display = 'flex';
 }
 
+// Shared: recomposite + save + update card + refresh modal in-place
+async function recomposeAndRefresh(nft) {
+  nft.image = await compositeFromLayers(nft.layers);
+  nft.attributes = buildNFTAttributes(nft.layers);
+  saveNFTsLocal();
+
+  // Update the card image in collection instantly (no full re-render)
+  const card = document.getElementById('card-' + nft.id);
+  if (card) {
+    const img = card.querySelector('img');
+    if (img) img.src = nft.image;
+    const layerCount = card.querySelectorAll('div')[2];
+    if (layerCount) layerCount.textContent = `${nft.gender||''} | ${(nft.layers||[]).length} layers`;
+  }
+
+  // Refresh modal canvas in-place
+  const mc = document.getElementById('modal-canvas-' + nft.id);
+  if (mc) {
+    const mctx = mc.getContext('2d');
+    mctx.clearRect(0, 0, mc.width, mc.height);
+    mctx.fillStyle = '#fff';
+    mctx.fillRect(0, 0, mc.width, mc.height);
+    for (let l of (nft.layers || [])) {
+      const img = await loadImage(l.imageUrl);
+      if (img) mctx.drawImage(img, 0, 0, mc.width, mc.height);
+    }
+  }
+
+  // Refresh layers list inside modal without closing it
+  const modal = document.getElementById('nft-modal-' + nft.id);
+  if (modal) {
+    const layersContainer = modal.querySelector('.layers-list');
+    if (layersContainer) {
+      layersContainer.innerHTML = buildLayersListHTML(nft);
+    }
+  }
+}
+
+function buildLayersListHTML(nft) {
+  return (nft.layers || []).map((l, idx) =>
+    `<div class="layer-row">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <img src="${l.imageUrl}" style="width:32px;height:32px;object-fit:contain;border:1px solid #808080;">
+        <span style="font-family:'Press Start 2P',monospace;font-size:7px;">${idx+1}. ${l.section}: ${escapeHtml(l.value)}</span>
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="App.editNFTLayer('${nft.id}',${idx},'up')" class="move-btn">▲</button>
+        <button onclick="App.editNFTLayer('${nft.id}',${idx},'down')" class="move-btn">▼</button>
+        <button onclick="App.deleteNFTLayer('${nft.id}',${idx})" class="move-btn" style="border-color:#ff4444;color:#aa0000;">✕</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
 async function applyLayerToNFT(nftId, section, value, imageUrl, layerId) {
   document.getElementById('add-layer-modal').style.display = 'none';
   let nft = nfts.find(n => n.id === nftId);
   if (!nft) return;
-
-  // Remove existing layer from same section (replace)
   nft.layers = (nft.layers || []).filter(l => l.section !== section);
-
-  // Add new layer
   nft.layers.push({ section, value, imageUrl });
-
-  // Re-sort by correct order
   nft.layers.sort((a, b) => SECTIONS_ORDER.indexOf(a.section) - SECTIONS_ORDER.indexOf(b.section));
-
-  // Recomposite image
-  nft.image = await compositeFromLayers(nft.layers);
-  nft.attributes = buildNFTAttributes(nft.layers);
-
-  saveNFTsLocal();
-  renderCollection();
+  await recomposeAndRefresh(nft);
   showToast(`✅ Layer added: ${section} → ${value}`);
-
-  // Refresh modal
-  document.getElementById('nft-modal-' + nftId)?.remove();
-  viewNFTDetails(nftId);
 }
 
 async function editNFTLayer(nftId, layerIndex, direction) {
   let nft = nfts.find(n => n.id === nftId);
   if (!nft || !nft.layers) return;
   let newLayers = [...nft.layers];
-  if (direction === 'up' && layerIndex > 0) [newLayers[layerIndex], newLayers[layerIndex-1]] = [newLayers[layerIndex-1], newLayers[layerIndex]];
-  else if (direction === 'down' && layerIndex < newLayers.length-1) [newLayers[layerIndex], newLayers[layerIndex+1]] = [newLayers[layerIndex+1], newLayers[layerIndex]];
+  if (direction === 'up' && layerIndex > 0)
+    [newLayers[layerIndex], newLayers[layerIndex-1]] = [newLayers[layerIndex-1], newLayers[layerIndex]];
+  else if (direction === 'down' && layerIndex < newLayers.length-1)
+    [newLayers[layerIndex], newLayers[layerIndex+1]] = [newLayers[layerIndex+1], newLayers[layerIndex]];
   else return;
   nft.layers = newLayers;
-  nft.image = await compositeFromLayers(newLayers);
-  nft.attributes = buildNFTAttributes(newLayers);
-  saveNFTsLocal();
+  await recomposeAndRefresh(nft);
   showToast('LAYER MOVED');
-  document.getElementById('nft-modal-' + nftId)?.remove();
-  viewNFTDetails(nftId);
 }
 
 async function deleteNFTLayer(nftId, layerIndex) {
@@ -1167,12 +1255,8 @@ async function deleteNFTLayer(nftId, layerIndex) {
   let removed = nft.layers[layerIndex];
   if (confirm(`DELETE "${removed.section}: ${removed.value}"?`)) {
     nft.layers.splice(layerIndex, 1);
-    nft.image = await compositeFromLayers(nft.layers);
-    nft.attributes = buildNFTAttributes(nft.layers);
-    saveNFTsLocal();
-    showToast('LAYER REMOVED');
-    document.getElementById('nft-modal-' + nftId)?.remove();
-    viewNFTDetails(nftId);
+    await recomposeAndRefresh(nft);
+    showToast('✅ LAYER REMOVED');
   }
 }
 
