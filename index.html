@@ -1079,3 +1079,149 @@ async function viewNFTDetails(id) {
       if (img) mctx.drawImage(img, 0, 0, 256, 256);
     }
   }
+}
+
+function openAddLayerModal(nftId) {
+  addLayerTargetNFTId = nftId;
+  const sectionEl = document.getElementById(`add-section-${nftId}`);
+  addLayerTargetSection = sectionEl ? sectionEl.value : SECTIONS_ORDER[0];
+
+  const nft = nfts.find(n => n.id === nftId);
+  const gender = nft ? nft.gender : 'both';
+
+  const layers = (layersBySection[addLayerTargetSection] || []).filter(l => l.gender === 'both' || l.gender === gender);
+  const listEl = document.getElementById('add-layer-list');
+  document.getElementById('add-layer-section').value = addLayerTargetSection;
+
+  if (!layers.length) {
+    listEl.innerHTML = '<div style="font-family:\'Press Start 2P\',monospace;font-size:8px;grid-column:1/-1;text-align:center;padding:20px;">[ NO LAYERS FOR THIS SECTION ]</div>';
+  } else {
+    listEl.innerHTML = layers.map(l => `
+      <div onclick="App.applyLayerToNFT('${nftId}','${addLayerTargetSection}','${escapeHtml(l.value).replace(/'/g,"\\'")}','${l.imageUrl.replace(/'/g,"\\'")}','${l.id}')"
+        style="border:2px outset #808080;padding:6px;background:#d4d0c8;cursor:pointer;text-align:center;">
+        <div style="aspect-ratio:1;background:#fff;"><img src="${l.imageUrl}" style="width:100%;height:100%;object-fit:contain;" loading="lazy"></div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:6px;margin-top:4px;">${escapeHtml(l.value)}</div>
+      </div>`).join('');
+  }
+
+  document.getElementById('add-layer-section').onchange = function() {
+    addLayerTargetSection = this.value;
+    const newLayers = (layersBySection[addLayerTargetSection] || []).filter(l => l.gender === 'both' || l.gender === gender);
+    listEl.innerHTML = newLayers.map(l => `
+      <div onclick="App.applyLayerToNFT('${nftId}','${addLayerTargetSection}','${escapeHtml(l.value).replace(/'/g,"\\'")}','${l.imageUrl.replace(/'/g,"\\'")}','${l.id}')"
+        style="border:2px outset #808080;padding:6px;background:#d4d0c8;cursor:pointer;text-align:center;">
+        <div style="aspect-ratio:1;background:#fff;"><img src="${l.imageUrl}" style="width:100%;height:100%;object-fit:contain;" loading="lazy"></div>
+        <div style="font-family:'Press Start 2P',monospace;font-size:6px;margin-top:4px;">${escapeHtml(l.value)}</div>
+      </div>`).join('');
+  };
+
+  document.getElementById('add-layer-modal').style.display = 'flex';
+}
+
+async function applyLayerToNFT(nftId, section, value, imageUrl, layerId) {
+  document.getElementById('add-layer-modal').style.display = 'none';
+  let nft = nfts.find(n => n.id === nftId);
+  if (!nft) return;
+
+  // Remove existing layer from same section (replace)
+  nft.layers = (nft.layers || []).filter(l => l.section !== section);
+
+  // Add new layer
+  nft.layers.push({ section, value, imageUrl });
+
+  // Re-sort by correct order
+  nft.layers.sort((a, b) => SECTIONS_ORDER.indexOf(a.section) - SECTIONS_ORDER.indexOf(b.section));
+
+  // Recomposite image
+  nft.image = await compositeFromLayers(nft.layers);
+  nft.attributes = buildNFTAttributes(nft.layers);
+
+  saveNFTsLocal();
+  renderCollection();
+  showToast(`✅ Layer added: ${section} → ${value}`);
+
+  // Refresh modal
+  document.getElementById('nft-modal-' + nftId)?.remove();
+  viewNFTDetails(nftId);
+}
+
+async function editNFTLayer(nftId, layerIndex, direction) {
+  let nft = nfts.find(n => n.id === nftId);
+  if (!nft || !nft.layers) return;
+  let newLayers = [...nft.layers];
+  if (direction === 'up' && layerIndex > 0) [newLayers[layerIndex], newLayers[layerIndex-1]] = [newLayers[layerIndex-1], newLayers[layerIndex]];
+  else if (direction === 'down' && layerIndex < newLayers.length-1) [newLayers[layerIndex], newLayers[layerIndex+1]] = [newLayers[layerIndex+1], newLayers[layerIndex]];
+  else return;
+  nft.layers = newLayers;
+  nft.image = await compositeFromLayers(newLayers);
+  nft.attributes = buildNFTAttributes(newLayers);
+  saveNFTsLocal();
+  showToast('LAYER MOVED');
+  document.getElementById('nft-modal-' + nftId)?.remove();
+  viewNFTDetails(nftId);
+}
+
+async function deleteNFTLayer(nftId, layerIndex) {
+  let nft = nfts.find(n => n.id === nftId);
+  if (!nft || !nft.layers) return;
+  let removed = nft.layers[layerIndex];
+  if (confirm(`DELETE "${removed.section}: ${removed.value}"?`)) {
+    nft.layers.splice(layerIndex, 1);
+    nft.image = await compositeFromLayers(nft.layers);
+    nft.attributes = buildNFTAttributes(nft.layers);
+    saveNFTsLocal();
+    showToast('LAYER REMOVED');
+    document.getElementById('nft-modal-' + nftId)?.remove();
+    viewNFTDetails(nftId);
+  }
+}
+
+// ============================================================
+// TAB SWITCH
+// ============================================================
+function switchTab(tab) {
+  ['layers','create','collection'].forEach(t => {
+    document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'create') updateStats();
+  if (tab === 'collection') renderCollection();
+}
+
+function onTotalChange() { updateStats(); }
+
+// ============================================================
+// WINDOW.APP
+// ============================================================
+window.App = {
+  switchTab, loadIndexJSON, deleteAllMatched,
+  toggleSectionLayers: (s) => { openSectionLayers = openSectionLayers === s ? null : s; renderSections(); },
+  addLayer, deleteLayer: deleteLayerFromFirebase,
+  onTotalChange,
+  startMint, deleteAllNFTs,
+  downloadAllPNG, downloadAllJSON,
+  viewNFTDetails, downloadSingleImage, downloadSingleJSON, deleteSingleNFT,
+  searchNFTs, clearSearch,
+  editNFTLayer, deleteNFTLayer,
+  openAddLayerModal, applyLayerToNFT
+};
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  // Load NFTs from localStorage first (instant)
+  loadNFTsLocal();
+  renderCollection();
+
+  // Listen to Firebase for layers
+  listenFirebase();
+
+  // Load index in background
+  loadIndexJSON();
+}
+
+init();
+</script>
+</body>
+</html>
