@@ -65,12 +65,13 @@
     .gender-badge-f { background: #ff88cc; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 6px; padding: 1px 4px; }
     .gender-badge-b { background: #808080; color: #fff; font-family: 'Press Start 2P', monospace; font-size: 6px; padding: 1px 4px; }
     .stat-box { background: #000080; color: #00ff00; border: 2px inset #808080; padding: 10px; font-family: 'Press Start 2P', monospace; font-size: 8px; text-align: center; }
+    .matched-warning { background: #aa0000; color: #ffff00; border: 3px solid #ff4444; padding: 8px 12px; font-family: 'Press Start 2P', monospace; font-size: 8px; text-align: center; margin-top: 8px; }
   </style>
 </head>
 <body>
 <div class="win95-desktop">
   <div class="win95-window">
-    <div class="win95-titlebar"><span>📁 404 PUNKS - UNIVERSAL NFT ENGINE v9.0</span><button onclick="location.reload()">✕</button></div>
+    <div class="win95-titlebar"><span>📁 404 PUNKS - UNIVERSAL NFT ENGINE v10.0</span><button onclick="location.reload()">✕</button></div>
     <div style="background: #c0c0c0; padding: 8px 16px 0 16px;">
       <div style="display: flex; gap: 4px; flex-wrap: wrap;">
         <button onclick="App.switchTab('layers')" id="tab-layers" class="win95-tab active">📂 LAYERS</button>
@@ -115,10 +116,6 @@
 
       <!-- ===== CREATE NFT TAB ===== -->
       <div id="panel-create" class="hidden">
-
-        <!-- LAYER ORDER INFO - HIDDEN -->
-
-        <!-- SUPER MINT BOX -->
         <div class="big-mint-box">
           <div style="font-family:'Press Start 2P',monospace; font-size:12px; color:#ffff00; margin-bottom:12px;">🚀 SUPER FAST NFT GENERATOR</div>
           <div style="font-family:'Press Start 2P',monospace; font-size:8px; color:#aaaaff; margin-bottom:16px;">Enter count → Hit MINT → Done in 20-30 seconds!</div>
@@ -133,6 +130,15 @@
             </div>
           </div>
           <textarea id="nft-description" rows="2" class="win95-input mt-3" style="background:#000; color:#aaa; font-family:'Press Start 2P'; font-size:8px; border:2px inset #4444ff;">404 PUNKS // RETRO GLITCH COLLECTION</textarea>
+
+          <!-- RARE BASE INFO -->
+          <div style="background:#000044; border:2px solid #4444ff; padding:8px; margin-top:12px; font-family:'Press Start 2P',monospace; font-size:7px; color:#aaaaff; text-align:left;">
+            🎯 RARE BASE QUOTAS (per 10,000):
+            <span style="color:#ff8800;"> ZOMBIE×95</span> |
+            <span style="color:#00ff88;"> APE×32</span> |
+            <span style="color:#ff44ff;"> ALIEN×15</span>
+          </div>
+
           <button id="bulk-mint-btn" onclick="App.startMint()" class="big-mint-btn">⚡ GENERATE NFTs NOW ⚡</button>
 
           <!-- PROGRESS -->
@@ -168,7 +174,6 @@
             <div id="zip-status" class="zip-progress mt-2"></div>
           </div>
         </div>
-
       </div>
 
       <!-- ===== COLLECTION TAB ===== -->
@@ -188,7 +193,7 @@
         <div class="win95-window" style="margin-bottom: 16px;">
           <div class="win95-titlebar match-engine-header">
             <span>🎯 UNIVERSAL MATCH ENGINE <span class="pulse-text" style="color:#ffff00;">● LIVE</span></span>
-            <span style="font-size:8px;">v9.0</span>
+            <span style="font-size:8px;">v10.0</span>
           </div>
           <div class="win95-content">
             <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
@@ -246,11 +251,20 @@
 // CONFIG
 // ============================================================
 const FIXED_INDEX_URL = "https://raw.githubusercontent.com/punksgif/punksgif.github.io/main/index.json";
-// Correct layer compositing order (bottom to top)
 const SECTIONS_ORDER = ["Background","Base","Nose","Face","Neck","Mouth","Head","Eyes","Beard","Accessory","Ear"];
 const MAX_NFT_LIMIT = 20000;
 const STORAGE_KEY = '404punks_nfts_v2';
 const STORAGE_LAYERS_KEY = '404punks_layers_v2';
+
+// ===== RARE BASE NAMES (lowercase for matching) =====
+// Beard section is blocked for these base values
+const NO_BEARD_BASES = ['alien', 'ape'];
+// Special quota bases (per 10,000 NFTs)
+const RARE_BASE_QUOTAS = {
+  'zombie': 95,
+  'ape':    32,
+  'alien':  15
+};
 
 // ============================================================
 // FIREBASE
@@ -305,25 +319,18 @@ function setZipStatus(msg, show) {
 }
 
 // ============================================================
-// LOCAL STORAGE NFT SAVE/LOAD
-// Each user's NFTs saved in their own localStorage
+// LOCAL STORAGE
 // ============================================================
 function saveNFTsLocal() {
   try {
-    // Store only metadata + image (no heavy layer images beyond what's needed)
     const toSave = nfts.map(n => ({
-      id: n.id,
-      name: n.name,
-      description: n.description,
-      image: n.image,
-      attributes: n.attributes,
-      layers: n.layers,
-      gender: n.gender,
-      createdAt: n.createdAt
+      id: n.id, name: n.name, description: n.description,
+      image: n.image, attributes: n.attributes, layers: n.layers,
+      gender: n.gender, createdAt: n.createdAt
     }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch(e) {
-    console.warn('localStorage save failed (likely quota):', e.message);
+    console.warn('localStorage save failed:', e.message);
     showToast('⚠️ Storage full! Download ZIPs to free space.');
   }
 }
@@ -336,10 +343,8 @@ function loadNFTsLocal() {
   return false;
 }
 
-// Also backup to Firebase (async, non-blocking)
 async function backupToFirebase() {
   try {
-    // Only store metadata, not images (images too large for Firebase)
     const meta = nfts.map(n => ({ id:n.id, name:n.name, gender:n.gender, attributes:n.attributes, layers:n.layers }));
     await database.ref('user_nfts_meta').set(meta);
   } catch(e) { /* silent */ }
@@ -410,6 +415,21 @@ function findMatchesForNFT(nft) {
   }
   matched.sort((a,b)=>a-b);
   return matched;
+}
+
+// Check if a given layer combo would be a match (for EDIT blocking)
+function wouldBeMatch(layers) {
+  if (!isIndexLoaded) return false;
+  const values = [];
+  for (const l of layers) {
+    if (l.section !== 'Background') values.push(String(l.value).toLowerCase().trim());
+  }
+  values.sort();
+  const key = createMatchKey(values);
+  for (const [, indexKey] of matchIndexMap.entries()) {
+    if (indexKey === key) return true;
+  }
+  return false;
 }
 
 function updateMatchBadgeForNFT(nft) {
@@ -501,33 +521,28 @@ function updateStats() {
 }
 
 // ============================================================
-// FIREBASE LAYER MANAGEMENT (Instant local update + background sync)
+// FIREBASE LAYER MANAGEMENT
 // ============================================================
 function toCleanArray(section) {
-  // Always ensure it's a plain array before saving to Firebase
   return (layersBySection[section] || []).filter(Boolean).map(l => ({
     id: l.id, value: l.value, imageUrl: l.imageUrl, gender: l.gender
   }));
 }
 
 async function addLayerToFirebase(section, layer) {
-  // 1. Instant local update — UI responds immediately
   layersBySection[section] = [...(layersBySection[section] || []), layer];
   renderSections();
   updateStats();
   showToast(`✅ ADDED: ${layer.value}`);
-  // 2. Background Firebase sync
   const cleanArr = toCleanArray(section);
   database.ref(`layers/${section}`).set(cleanArr).catch(e => console.warn('Firebase sync:', e));
 }
 
 async function deleteLayerFromFirebase(section, id) {
-  // 1. Instant local update
   layersBySection[section] = (layersBySection[section] || []).filter(l => String(l.id) !== String(id));
   renderSections();
   updateStats();
   showToast('🗑️ LAYER DELETED');
-  // 2. Background Firebase sync
   const cleanArr = toCleanArray(section);
   database.ref(`layers/${section}`).set(cleanArr).catch(e => console.warn('Firebase sync:', e));
 }
@@ -542,12 +557,10 @@ async function addLayer() {
   if (imgUrl.includes('github.com') && !imgUrl.includes('raw.githubusercontent.com'))
     imgUrl = imgUrl.replace('github.com','raw.githubusercontent.com').replace('/blob/','/');
   let newLayer = { id: Date.now()+'_'+Math.random().toString(36).substr(2,6), value: val, imageUrl: imgUrl, gender };
-  // Validate image first, then add instantly
   let test = new Image();
   test.onload = () => addLayerToFirebase(section, newLayer);
   test.onerror = () => showToast('❌ BAD IMAGE URL');
   test.src = imgUrl;
-  // Clear inputs immediately for faster workflow
   document.getElementById('github-url').value = '';
   document.getElementById('layer-value').value = '';
 }
@@ -557,12 +570,10 @@ function listenFirebase() {
   database.ref('layers').on('value', snap => {
     let d = snap.val();
     let totalFound = 0;
-
     if (d && typeof d === 'object') {
       for (let s of SECTIONS_ORDER) {
         let raw = d[s];
         if (!raw) { layersBySection[s] = []; continue; }
-        // Firebase may return object {0:{...}, 1:{...}} or array
         if (Array.isArray(raw)) {
           layersBySection[s] = raw.filter(Boolean);
         } else if (typeof raw === 'object') {
@@ -586,7 +597,7 @@ function listenFirebase() {
 }
 
 // ============================================================
-// IMAGE COMPOSITING (FAST - Parallel loading)
+// IMAGE COMPOSITING
 // ============================================================
 const imageCache = new Map();
 
@@ -625,14 +636,10 @@ async function compositeFromLayers(layers, w=512, h=512) {
   let ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
-
-  // Load images in parallel (they may already be cached)
   const images = await Promise.all(layers.map(l => loadImage(l.imageUrl)));
-
   for (let img of images) {
     if (img) ctx.drawImage(img, 0, 0, w, h);
   }
-
   if (canvas instanceof OffscreenCanvas) {
     const blob = await canvas.convertToBlob({ type: 'image/png' });
     return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
@@ -641,13 +648,15 @@ async function compositeFromLayers(layers, w=512, h=512) {
 }
 
 // ============================================================
-// GENERATIVE NFT ENGINE
+// JSON ATTRIBUTE BUILDER
+// ===  Base section: trait_type = "," (comma only, no "Base" text)
 // ============================================================
 function buildNFTAttributes(layers) {
   let attrs = [];
   let baseValue = null;
   for (let l of layers) { if (l.section === "Base") { baseValue = l.value; break; } }
-  if (baseValue) attrs.push({ trait_type: "Base", value: baseValue });
+  // Base: trait_type is just a comma character
+  if (baseValue) attrs.push({ trait_type: ",", value: baseValue });
   for (let l of layers) {
     if (l.section === "Background" || l.section === "Base") continue;
     attrs.push({ trait_type: l.section, value: l.value });
@@ -656,14 +665,59 @@ function buildNFTAttributes(layers) {
   return attrs;
 }
 
-// Build duplicate detection set from existing NFTs + index
+// ============================================================
+// RARE BASE QUOTA SYSTEM
+// ============================================================
+function buildRareQuotas(total) {
+  // Scale quotas proportionally to requested total (base is per 10,000)
+  const scale = total / 10000;
+  const quotas = {};
+  for (const [base, count] of Object.entries(RARE_BASE_QUOTAS)) {
+    quotas[base] = Math.max(1, Math.round(count * scale));
+  }
+  return quotas;
+}
+
+function pickBaseForSlot(gender, rareQuotas, rareUsed, allBaseLayers) {
+  // Determine if we should force a rare base for this slot
+  // First check if any rare quota still has slots available
+  const available = allBaseLayers.filter(l => l.gender === 'both' || l.gender === gender);
+  if (!available.length) return null;
+
+  // Separate rare vs normal bases
+  const rareAvail = available.filter(l => {
+    const lv = l.value.toLowerCase().trim();
+    return rareQuotas[lv] !== undefined;
+  });
+  const normalAvail = available.filter(l => {
+    const lv = l.value.toLowerCase().trim();
+    return rareQuotas[lv] === undefined;
+  });
+
+  // Random selection weighted by remaining quota
+  // Each rare base gets exactly its quota, rest are normal
+  // We'll decide per-NFT probabilistically and then enforce limits
+  // Strategy: for each NFT, with a small random chance, try to assign a rare base
+  // But if the rare is already maxed, fallback to normal
+
+  // Calculate remaining rare slots
+  let totalRemainingRare = 0;
+  for (const [base, quota] of Object.entries(rareQuotas)) {
+    totalRemainingRare += Math.max(0, quota - (rareUsed[base] || 0));
+  }
+
+  return { rareAvail, normalAvail, totalRemainingRare };
+}
+
+// ============================================================
+// NFT GENERATION ENGINE
+// ============================================================
 function buildExistingKeys() {
   const existing = new Set();
   for (const n of nfts) {
     const key = getNFTTraitKey(n);
     if (key) existing.add(key);
   }
-  // Also add index.json matched keys
   if (isIndexLoaded) {
     for (const [, v] of matchIndexMap.entries()) {
       existing.add(v);
@@ -672,8 +726,8 @@ function buildExistingKeys() {
   return existing;
 }
 
-function generateNFTLayers(gender, existingKeys, maxAttempts=50) {
-  // Layer sections required
+// Generate a single NFT's layers with all rules applied
+function generateNFTLayers(gender, existingKeys, rareQuotas, rareUsed, totalRemaining, maxAttempts=50) {
   const bgLayers = (layersBySection['Background'] || []).filter(l => l.gender === 'both' || l.gender === gender);
   const baseLayers = (layersBySection['Base'] || []).filter(l => l.gender === 'both' || l.gender === gender);
 
@@ -686,44 +740,104 @@ function generateNFTLayers(gender, existingKeys, maxAttempts=50) {
     const bg = bgLayers[Math.floor(Math.random() * bgLayers.length)];
     pickedLayers.push({ section: 'Background', value: bg.value, imageUrl: bg.imageUrl });
 
-    // Base (required)
-    const base = baseLayers[Math.floor(Math.random() * baseLayers.length)];
-    pickedLayers.push({ section: 'Base', value: base.value, imageUrl: base.imageUrl });
+    // ---- BASE SELECTION WITH RARE QUOTA ----
+    let chosenBase = null;
 
-    // Optional layers - each section randomly included/excluded
-    // Neck: only 10% chance | All others: 65% chance
+    // Calculate remaining rare slots
+    let totalRemainingRare = 0;
+    for (const [base, quota] of Object.entries(rareQuotas)) {
+      totalRemainingRare += Math.max(0, quota - (rareUsed[base] || 0));
+    }
+
+    // Should we attempt a rare base?
+    const rareBasesCandidates = baseLayers.filter(l => rareQuotas[l.value.toLowerCase().trim()] !== undefined);
+    const normalBaseCandidates = baseLayers.filter(l => rareQuotas[l.value.toLowerCase().trim()] === undefined);
+
+    // Probability of picking a rare base = remaining rare slots / remaining NFTs
+    const rareProb = totalRemaining > 0 ? totalRemainingRare / totalRemaining : 0;
+
+    if (rareBasesCandidates.length > 0 && Math.random() < rareProb) {
+      // Try to pick a rare base that still has quota
+      const eligible = rareBasesCandidates.filter(l => {
+        const lv = l.value.toLowerCase().trim();
+        return (rareUsed[lv] || 0) < (rareQuotas[lv] || 0);
+      });
+      if (eligible.length > 0) {
+        chosenBase = eligible[Math.floor(Math.random() * eligible.length)];
+        // Increment usage
+        const lv = chosenBase.value.toLowerCase().trim();
+        rareUsed[lv] = (rareUsed[lv] || 0) + 1;
+      }
+    }
+
+    // Fallback to normal base
+    if (!chosenBase) {
+      const normalCandidates = normalBaseCandidates.length > 0 ? normalBaseCandidates : baseLayers;
+      chosenBase = normalCandidates[Math.floor(Math.random() * normalCandidates.length)];
+    }
+
+    pickedLayers.push({ section: 'Base', value: chosenBase.value, imageUrl: chosenBase.imageUrl });
+
+    // Determine if this base blocks Beard
+    const baseValueLower = chosenBase.value.toLowerCase().trim();
+    const beardBlocked = NO_BEARD_BASES.some(b => baseValueLower.includes(b));
+
+    // ---- OPTIONAL LAYERS ----
     for (let s of SECTIONS_ORDER) {
       if (s === 'Background' || s === 'Base') continue;
+
+      // Block Beard for Alien & Ape bases
+      if (s === 'Beard' && beardBlocked) continue;
+
       const available = (layersBySection[s] || []).filter(l => l.gender === 'both' || l.gender === gender);
       if (!available.length) continue;
 
-      const includeChance = s === 'Neck'      ? 0.10
-        : s === 'Face'      ? 0.07
-        : s === 'Nose'      ? 0.04
-        : s === 'Mouth'     ? 0.16
-        : s === 'Ear'       ? 0.40
-        : s === 'Accessory' ? 0.55
+      // Updated probabilities per user request
+      const includeChance =
+          s === 'Neck'      ? 0.10   // 10%
+        : s === 'Face'      ? 0.07   // 7%
+        : s === 'Nose'      ? 0.04   // 4%
+        : s === 'Mouth'     ? 0.01   // 1%  (was 16%)
+        : s === 'Head'      ? 0.88   // 88% (was 65%)
+        : s === 'Eyes'      ? 0.70   // 70% (was 65%)
+        : s === 'Ear'       ? 0.02   // 2%  (was 40%)
+        : s === 'Accessory' ? 0.03   // 3%  (was 55%)
         : 0.65;
+
       if (Math.random() < includeChance) {
         const picked = available[Math.floor(Math.random() * available.length)];
         pickedLayers.push({ section: s, value: picked.value, imageUrl: picked.imageUrl });
       }
     }
 
-    // Sort layers by SECTIONS_ORDER (correct compositing order)
+    // Sort by SECTIONS_ORDER (correct compositing order)
     pickedLayers.sort((a, b) => SECTIONS_ORDER.indexOf(a.section) - SECTIONS_ORDER.indexOf(b.section));
 
-    // Check duplicate
+    // Build attributes and check for duplicate / index match
     const attrs = buildNFTAttributes(pickedLayers);
-    const traitValues = attrs.filter(a => a.trait_type !== 'Attribute Count').map(a => String(a.value).toLowerCase().trim()).sort();
+
+    // Build trait key (exclude background, exclude "Attribute Count")
+    const traitValues = [];
+    for (const l of pickedLayers) {
+      if (l.section !== 'Background') traitValues.push(String(l.value).toLowerCase().trim());
+    }
+    traitValues.sort();
     const key = createMatchKey(traitValues);
 
-    if (!existingKeys.has(key)) {
-      existingKeys.add(key);
-      return { layers: pickedLayers, attributes: attrs, traitKey: key };
+    // Skip if duplicate OR matches index
+    if (existingKeys.has(key)) continue;
+    if (isIndexLoaded) {
+      let indexMatch = false;
+      for (const [, indexKey] of matchIndexMap.entries()) {
+        if (indexKey === key) { indexMatch = true; break; }
+      }
+      if (indexMatch) continue;
     }
+
+    existingKeys.add(key);
+    return { layers: pickedLayers, attributes: attrs, traitKey: key };
   }
-  return null; // Could not generate unique NFT after max attempts
+  return null;
 }
 
 async function startMint() {
@@ -731,7 +845,6 @@ async function startMint() {
   const prefix = document.getElementById('name-prefix').value.trim() || "PUNK#";
   const desc = document.getElementById('nft-description').value;
 
-  // Validate layers
   const bgCount = (layersBySection['Background'] || []).length;
   const baseCount = (layersBySection['Base'] || []).length;
   if (!bgCount) { showToast('⚠️ No Background layer! Add one in the Layers tab.'); return; }
@@ -754,7 +867,7 @@ async function startMint() {
     await preloadAllImages();
     await new Promise(r => setTimeout(r, 10));
 
-    // Phase 2: Generate layer combos (CPU only, very fast)
+    // Phase 2: Generate layer combos
     progText.innerText = '🎲 GENERATING COMBOS...';
     progPhase.innerText = 'Phase 2/3: Generating traits';
 
@@ -762,15 +875,23 @@ async function startMint() {
     const femaleCount = Math.floor(total / 2);
     const existingKeys = buildExistingKeys();
 
-    const generatedSets = []; // { layers, attributes, gender }
+    // Build rare quotas scaled to total
+    const rareQuotas = buildRareQuotas(total);
+    const rareUsed = {}; // tracks how many rare bases have been used
+    for (const base of Object.keys(rareQuotas)) rareUsed[base] = 0;
+
+    const generatedSets = [];
     let skippedDuplicates = 0;
     let startTime = Date.now();
 
+    let remaining = total;
+
     // Generate male NFTs
     for (let i = 0; i < maleCount; i++) {
-      const result = generateNFTLayers('male', existingKeys);
+      const result = generateNFTLayers('male', existingKeys, rareQuotas, rareUsed, remaining, 80);
       if (result) {
         generatedSets.push({ ...result, gender: 'male' });
+        remaining--;
       } else {
         skippedDuplicates++;
       }
@@ -784,9 +905,10 @@ async function startMint() {
 
     // Generate female NFTs
     for (let i = 0; i < femaleCount; i++) {
-      const result = generateNFTLayers('female', existingKeys);
+      const result = generateNFTLayers('female', existingKeys, rareQuotas, rareUsed, remaining, 80);
       if (result) {
         generatedSets.push({ ...result, gender: 'female' });
+        remaining--;
       } else {
         skippedDuplicates++;
       }
@@ -798,29 +920,30 @@ async function startMint() {
       }
     }
 
-    // Shuffle so male/female are mixed
+    // Shuffle so male/female + rare are randomly distributed
     for (let i = generatedSets.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [generatedSets[i], generatedSets[j]] = [generatedSets[j], generatedSets[i]];
     }
 
+    // Report rare usage
+    const rareReport = Object.entries(rareUsed).map(([k,v])=>`${k.toUpperCase()}:${v}`).join(' | ');
     progText.innerText = `✅ ${generatedSets.length} COMBOS READY`;
-    if (skippedDuplicates > 0) showToast(`⚠️ ${skippedDuplicates} duplicates removed`, 4000);
+    progPhase.innerText = `🎯 Rare: ${rareReport}`;
+    if (skippedDuplicates > 0) showToast(`⚠️ ${skippedDuplicates} duplicates/matches removed`, 4000);
     await new Promise(r => setTimeout(r, 100));
 
-    // Phase 3: Composite images in parallel batches
+    // Phase 3: Composite images
     progText.innerText = '🎨 COMPOSITING IMAGES...';
     progPhase.innerText = 'Phase 3/3: Drawing NFTs';
     progFill.style.width = '0%';
 
-    const BATCH_SIZE = 50; // Process 50 at a time for speed
+    const BATCH_SIZE = 50;
     const newNFTs = [];
     startTime = Date.now();
 
     for (let i = 0; i < generatedSets.length; i += BATCH_SIZE) {
       const batch = generatedSets.slice(i, Math.min(i + BATCH_SIZE, generatedSets.length));
-
-      // Composite all in batch in parallel
       const images = await Promise.all(batch.map(g => compositeFromLayers(g.layers)));
 
       for (let bi = 0; bi < batch.length; bi++) {
@@ -847,22 +970,20 @@ async function startMint() {
       const elapsed = (Date.now() - startTime) / 1000;
       if (elapsed > 1) {
         const rate = done / elapsed;
-        const remaining = (generatedSets.length - done) / rate;
-        progEta.innerText = `⚡ Speed: ${Math.round(rate)}/sec | ETA: ${Math.round(remaining)}s`;
+        const rem2 = (generatedSets.length - done) / rate;
+        progEta.innerText = `⚡ Speed: ${Math.round(rate)}/sec | ETA: ${Math.round(rem2)}s`;
       }
 
-      // Yield to browser every batch
       await new Promise(r => setTimeout(r, 0));
     }
 
-    // Save to localStorage
     nfts.push(...newNFTs);
     saveNFTsLocal();
-    backupToFirebase(); // Async background backup
+    backupToFirebase();
 
     renderCollection();
-    showToast(`✅ ${newNFTs.length} NFTs generated! (${skippedDuplicates} duplicates skipped)`);
-    progText.innerText = `✅ DONE! ${newNFTs.length} NFTs`;
+    showToast(`✅ ${newNFTs.length} NFTs generated! (${skippedDuplicates} skipped)`);
+    progText.innerText = `✅ DONE! ${newNFTs.length} NFTs | ${rareReport}`;
     progEta.innerText = `Total time: ${Math.round((Date.now() - startTime) / 1000)}s`;
 
   } catch(err) {
@@ -875,7 +996,7 @@ async function startMint() {
 }
 
 // ============================================================
-// ZIP DOWNLOADS (Sequential serial naming)
+// ZIP DOWNLOADS
 // ============================================================
 function dataURLtoUint8Array(dataURL) {
   const base64 = dataURL.split(',')[1];
@@ -891,15 +1012,11 @@ async function downloadAllPNG() {
   setZipStatus(`⏳ Building PNG zip (${list.length} files)...`, true);
   showToast('⏳ Building images.zip...');
   await new Promise(r => setTimeout(r, 10));
-
   const zip = new JSZip();
   for (let i = 0; i < list.length; i++) {
-    const serial = i + 1; // 1.png, 2.png, ...
+    const serial = i + 1;
     zip.file(`${serial}.png`, dataURLtoUint8Array(list[i].image));
-    if (i % 100 === 0) {
-      setZipStatus(`⏳ Packing ${i+1}/${list.length}...`, true);
-      await new Promise(r => setTimeout(r, 1));
-    }
+    if (i % 100 === 0) { setZipStatus(`⏳ Packing ${i+1}/${list.length}...`, true); await new Promise(r => setTimeout(r, 1)); }
   }
   setZipStatus('⚙️ Compressing...', true);
   const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
@@ -916,22 +1033,13 @@ async function downloadAllJSON() {
   setZipStatus(`⏳ Building JSON zip (${list.length} files)...`, true);
   showToast('⏳ Building metadata.zip...');
   await new Promise(r => setTimeout(r, 10));
-
   const zip = new JSZip();
   for (let i = 0; i < list.length; i++) {
-    const serial = i + 1; // 1.json, 2.json, ...
+    const serial = i + 1;
     const n = list[i];
-    const meta = {
-      name: n.name,
-      description: n.description,
-      image: `${serial}.png`,
-      attributes: n.attributes
-    };
+    const meta = { name: n.name, description: n.description, image: `${serial}.png`, attributes: n.attributes };
     zip.file(`${serial}.json`, JSON.stringify(meta, null, 2));
-    if (i % 500 === 0) {
-      setZipStatus(`⏳ JSON ${i+1}/${list.length}...`, true);
-      await new Promise(r => setTimeout(r, 1));
-    }
+    if (i % 500 === 0) { setZipStatus(`⏳ JSON ${i+1}/${list.length}...`, true); await new Promise(r => setTimeout(r, 1)); }
   }
   setZipStatus('⚙️ Compressing...', true);
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
@@ -943,7 +1051,7 @@ async function downloadAllJSON() {
 }
 
 // ============================================================
-// COLLECTION RENDER — Virtual Scroll (loads all 20k, shows in chunks)
+// COLLECTION RENDER — Virtual Scroll
 // ============================================================
 let vsPage = 0;
 const VS_PAGE_SIZE = 50;
@@ -960,21 +1068,13 @@ function renderCollection() {
     ? `<div class="order-tag">📊 ${displayNFTs.length} / ${nfts.length} NFTs | 💾 Local Storage</div>`
     : '';
   if (!displayNFTs.length) { container.innerHTML = ''; return; }
-
   container.innerHTML = '';
-  // Remove old sentinel
   document.getElementById('vs-sentinel')?.remove();
-
-  // Render first page
   renderVSPage(container, displayNFTs);
-
-  // Add scroll sentinel for infinite loading
   const sentinel = document.createElement('div');
   sentinel.id = 'vs-sentinel';
   sentinel.style.cssText = 'height:2px;width:100%;grid-column:1/-1;';
   container.parentElement.appendChild(sentinel);
-
-  // Observe sentinel
   if (window._vsObserver) window._vsObserver.disconnect();
   window._vsObserver = new IntersectionObserver(entries => {
     if (entries[0].isIntersecting) renderVSPage(container, displayNFTs);
@@ -1013,7 +1113,6 @@ function renderVSPage(container, displayNFTs) {
   container.appendChild(frag);
   vsPage++;
 
-  // Update match badges for this page only
   if (isIndexLoaded) {
     for (let idx = start; idx < end; idx++) updateMatchBadgeForNFT(displayNFTs[idx]);
   }
@@ -1074,7 +1173,7 @@ function downloadSingleJSON(id, serial) {
 }
 
 // ============================================================
-// NFT EDIT MODAL
+// NFT EDIT MODAL — with Match Block on Edit
 // ============================================================
 async function viewNFTDetails(id) {
   let nft = nfts.find(n => n.id === id);
@@ -1086,17 +1185,16 @@ async function viewNFTDetails(id) {
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;overflow:auto;';
 
   const matches = isIndexLoaded ? findMatchesForNFT(nft) : [];
-  const matchHtml = matches.length > 0
-    ? `<div style="background:#000080;color:#ffff00;border:2px solid #4444ff;padding:8px;margin-bottom:10px;font-family:'Press Start 2P',monospace;font-size:7px;">🎯 MATCH (${matches.length}): ${matches.slice(0,8).map(n=>'#'+n).join(', ')}${matches.length>8?' +more':''}</div>`
+  const isMatched = matches.length > 0;
+  const matchHtml = isMatched
+    ? `<div class="matched-warning">🚫 MATCHED! Token(s): ${matches.slice(0,8).map(n=>'#'+n).join(', ')}${matches.length>8?' +more':''}<br>⚠️ এই NFT টি index-এ match করে। এটি তৈরি করা যাবে না!</div>`
     : '';
 
   let layersHtml = buildLayersListHTML(nft);
-
-  // Build add-layer section selector
   const sectionOpts = SECTIONS_ORDER.map(s => `<option value="${s}">${s}</option>`).join('');
 
   modal.innerHTML = `<div class="win95-window" style="width:95%;max-width:520px;max-height:95vh;overflow:auto;">
-    <div class="win95-titlebar"><span>✏️ EDIT: ${escapeHtml(nft.name)} (${nft.gender})</span><button onclick="document.getElementById('nft-modal-${id}').remove()">✕</button></div>
+    <div class="win95-titlebar" style="background:${isMatched?'#aa0000':'#000080'};"><span>✏️ EDIT: ${escapeHtml(nft.name)} (${nft.gender})${isMatched?' ⚠️ MATCHED':''}</span><button onclick="document.getElementById('nft-modal-${id}').remove()">✕</button></div>
     <div class="win95-content">
       <canvas id="modal-canvas-${id}" width="256" height="256" style="width:100%;margin-bottom:10px;border:3px outset #808080;display:block;"></canvas>
       ${matchHtml}
@@ -1121,7 +1219,6 @@ async function viewNFTDetails(id) {
 
   document.body.appendChild(modal);
 
-  // Render canvas
   const mc = document.getElementById('modal-canvas-' + id);
   if (mc) {
     const mctx = mc.getContext('2d');
@@ -1141,42 +1238,71 @@ function openAddLayerModal(nftId) {
   const nft = nfts.find(n => n.id === nftId);
   const gender = nft ? nft.gender : 'both';
 
+  // Check if target section is Beard and base is blocked
+  const baseLayer = nft && nft.layers ? nft.layers.find(l => l.section === 'Base') : null;
+  const baseValueLower = baseLayer ? baseLayer.value.toLowerCase().trim() : '';
+  const beardBlocked = NO_BEARD_BASES.some(b => baseValueLower.includes(b));
+
+  if (addLayerTargetSection === 'Beard' && beardBlocked) {
+    showToast(`🚫 Beard layer cannot be added to ${baseLayer.value} base!`);
+    return;
+  }
+
   const layers = (layersBySection[addLayerTargetSection] || []).filter(l => l.gender === 'both' || l.gender === gender);
   const listEl = document.getElementById('add-layer-list');
   document.getElementById('add-layer-section').value = addLayerTargetSection;
 
-  if (!layers.length) {
-    listEl.innerHTML = '<div style="font-family:\'Press Start 2P\',monospace;font-size:8px;grid-column:1/-1;text-align:center;padding:20px;">[ NO LAYERS FOR THIS SECTION ]</div>';
-  } else {
-    listEl.innerHTML = layers.map(l => `
-      <div onclick="App.applyLayerToNFT('${nftId}','${addLayerTargetSection}','${escapeHtml(l.value).replace(/'/g,"\\'")}','${l.imageUrl.replace(/'/g,"\\'")}','${l.id}')"
-        style="border:2px outset #808080;padding:6px;background:#d4d0c8;cursor:pointer;text-align:center;">
-        <div style="aspect-ratio:1;background:#fff;"><img src="${l.imageUrl}" style="width:100%;height:100%;object-fit:contain;" loading="lazy"></div>
-        <div style="font-family:'Press Start 2P',monospace;font-size:6px;margin-top:4px;">${escapeHtml(l.value)}</div>
-      </div>`).join('');
+  function renderModalLayers(sec) {
+    // Check beard block for new section
+    if (sec === 'Beard' && beardBlocked) {
+      listEl.innerHTML = `<div style="font-family:'Press Start 2P',monospace;font-size:8px;grid-column:1/-1;text-align:center;padding:20px;color:#aa0000;">🚫 Beard BLOCKED for ${baseLayer ? baseLayer.value : 'this'} base</div>`;
+      return;
+    }
+    const layerList = (layersBySection[sec] || []).filter(l => l.gender === 'both' || l.gender === gender);
+    if (!layerList.length) {
+      listEl.innerHTML = '<div style="font-family:\'Press Start 2P\',monospace;font-size:8px;grid-column:1/-1;text-align:center;padding:20px;">[ NO LAYERS ]</div>';
+    } else {
+      listEl.innerHTML = layerList.map(l => `
+        <div onclick="App.applyLayerToNFT('${nftId}','${sec}','${escapeHtml(l.value).replace(/'/g,"\\'")}','${l.imageUrl.replace(/'/g,"\\'")}','${l.id}')"
+          style="border:2px outset #808080;padding:6px;background:#d4d0c8;cursor:pointer;text-align:center;">
+          <div style="aspect-ratio:1;background:#fff;"><img src="${l.imageUrl}" style="width:100%;height:100%;object-fit:contain;" loading="lazy"></div>
+          <div style="font-family:'Press Start 2P',monospace;font-size:6px;margin-top:4px;">${escapeHtml(l.value)}</div>
+        </div>`).join('');
+    }
   }
+
+  renderModalLayers(addLayerTargetSection);
 
   document.getElementById('add-layer-section').onchange = function() {
     addLayerTargetSection = this.value;
-    const newLayers = (layersBySection[addLayerTargetSection] || []).filter(l => l.gender === 'both' || l.gender === gender);
-    listEl.innerHTML = newLayers.map(l => `
-      <div onclick="App.applyLayerToNFT('${nftId}','${addLayerTargetSection}','${escapeHtml(l.value).replace(/'/g,"\\'")}','${l.imageUrl.replace(/'/g,"\\'")}','${l.id}')"
-        style="border:2px outset #808080;padding:6px;background:#d4d0c8;cursor:pointer;text-align:center;">
-        <div style="aspect-ratio:1;background:#fff;"><img src="${l.imageUrl}" style="width:100%;height:100%;object-fit:contain;" loading="lazy"></div>
-        <div style="font-family:'Press Start 2P',monospace;font-size:6px;margin-top:4px;">${escapeHtml(l.value)}</div>
-      </div>`).join('');
+    renderModalLayers(addLayerTargetSection);
   };
 
   document.getElementById('add-layer-modal').style.display = 'flex';
 }
 
-// Shared: recomposite + save + update card + refresh modal in-place
-async function recomposeAndRefresh(nft) {
+// Recompose and refresh — but BLOCK if result would be a match
+async function recomposeAndRefresh(nft, skipMatchCheck=false) {
+  // Match check before saving
+  if (!skipMatchCheck && isIndexLoaded) {
+    if (wouldBeMatch(nft.layers)) {
+      showToast('🚫 এই layer combination index-এ match করে! তৈরি করা যাবে না।', 5000);
+      // Revert to saved version
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      const savedNFT = saved.find(n => n.id === nft.id);
+      if (savedNFT) {
+        nft.layers = savedNFT.layers;
+        nft.attributes = savedNFT.attributes;
+        nft.image = savedNFT.image;
+      }
+      return false;
+    }
+  }
+
   nft.image = await compositeFromLayers(nft.layers);
   nft.attributes = buildNFTAttributes(nft.layers);
   saveNFTsLocal();
 
-  // Update the card image in collection instantly (no full re-render)
   const card = document.getElementById('card-' + nft.id);
   if (card) {
     const img = card.querySelector('img');
@@ -1185,7 +1311,6 @@ async function recomposeAndRefresh(nft) {
     if (layerCount) layerCount.textContent = `${nft.gender||''} | ${(nft.layers||[]).length} layers`;
   }
 
-  // Refresh modal canvas in-place
   const mc = document.getElementById('modal-canvas-' + nft.id);
   if (mc) {
     const mctx = mc.getContext('2d');
@@ -1198,7 +1323,6 @@ async function recomposeAndRefresh(nft) {
     }
   }
 
-  // Refresh layers list inside modal without closing it
   const modal = document.getElementById('nft-modal-' + nft.id);
   if (modal) {
     const layersContainer = modal.querySelector('.layers-list');
@@ -1206,6 +1330,7 @@ async function recomposeAndRefresh(nft) {
       layersContainer.innerHTML = buildLayersListHTML(nft);
     }
   }
+  return true;
 }
 
 function buildLayersListHTML(nft) {
@@ -1228,11 +1353,33 @@ async function applyLayerToNFT(nftId, section, value, imageUrl, layerId) {
   document.getElementById('add-layer-modal').style.display = 'none';
   let nft = nfts.find(n => n.id === nftId);
   if (!nft) return;
+
+  // Save old state for rollback
+  const oldLayers = JSON.parse(JSON.stringify(nft.layers || []));
+
+  // Check if adding Beard to a blocked base
+  if (section === 'Beard') {
+    const baseLayer = nft.layers.find(l => l.section === 'Base');
+    const bvl = baseLayer ? baseLayer.value.toLowerCase().trim() : '';
+    if (NO_BEARD_BASES.some(b => bvl.includes(b))) {
+      showToast(`🚫 Beard cannot be added to ${baseLayer.value} base!`, 4000);
+      return;
+    }
+  }
+
+  // Apply new layer
   nft.layers = (nft.layers || []).filter(l => l.section !== section);
   nft.layers.push({ section, value, imageUrl });
   nft.layers.sort((a, b) => SECTIONS_ORDER.indexOf(a.section) - SECTIONS_ORDER.indexOf(b.section));
-  await recomposeAndRefresh(nft);
-  showToast(`✅ Layer added: ${section} → ${value}`);
+
+  const success = await recomposeAndRefresh(nft);
+  if (success) {
+    showToast(`✅ Layer added: ${section} → ${value}`);
+  } else {
+    // Rollback
+    nft.layers = oldLayers;
+    showToast('🚫 BLOCKED: এই combination index-তে match করে!', 5000);
+  }
 }
 
 async function editNFTLayer(nftId, layerIndex, direction) {
@@ -1245,7 +1392,7 @@ async function editNFTLayer(nftId, layerIndex, direction) {
     [newLayers[layerIndex], newLayers[layerIndex+1]] = [newLayers[layerIndex+1], newLayers[layerIndex]];
   else return;
   nft.layers = newLayers;
-  await recomposeAndRefresh(nft);
+  await recomposeAndRefresh(nft, true); // Layer order change doesn't change traits
   showToast('LAYER MOVED');
 }
 
@@ -1253,10 +1400,20 @@ async function deleteNFTLayer(nftId, layerIndex) {
   let nft = nfts.find(n => n.id === nftId);
   if (!nft || !nft.layers) return;
   let removed = nft.layers[layerIndex];
+
+  // Protect Background & Base deletion check
   if (confirm(`DELETE "${removed.section}: ${removed.value}"?`)) {
+    const oldLayers = JSON.parse(JSON.stringify(nft.layers));
     nft.layers.splice(layerIndex, 1);
-    await recomposeAndRefresh(nft);
-    showToast('✅ LAYER REMOVED');
+
+    // After deletion, check if result is a match (unlikely but check)
+    const success = await recomposeAndRefresh(nft);
+    if (!success) {
+      nft.layers = oldLayers;
+      showToast('🚫 BLOCKED: resultant combination matches index!', 4000);
+    } else {
+      showToast('✅ LAYER REMOVED');
+    }
   }
 }
 
@@ -1294,14 +1451,9 @@ window.App = {
 // INIT
 // ============================================================
 async function init() {
-  // Load NFTs from localStorage first (instant)
   loadNFTsLocal();
   renderCollection();
-
-  // Listen to Firebase for layers
   listenFirebase();
-
-  // Load index in background
   loadIndexJSON();
 }
 
