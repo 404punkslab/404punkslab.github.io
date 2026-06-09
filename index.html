@@ -150,12 +150,12 @@
       <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
         <div class="bg-cyan-950/40 rounded-xl p-2 border border-cyan-700/50">
           <span class="text-cyan-300 font-black">👽 Alien Base</span>
-          <div class="text-slate-300 mt-1">Max: <span class="text-cyan-400 font-black">12</span> total</div>
+          <div class="text-slate-300 mt-1">Max: <span class="text-cyan-400 font-black">18</span> total</div>
           <div class="text-slate-500 text-[10px] mt-1">❌ No Beard, Mouth, Face, Nose</div>
         </div>
         <div class="bg-orange-950/40 rounded-xl p-2 border border-orange-700/50">
           <span class="text-orange-300 font-black">🦍 Ape Base</span>
-          <div class="text-slate-300 mt-1">Max: <span class="text-orange-400 font-black">32</span> total</div>
+          <div class="text-slate-300 mt-1">Max: <span class="text-orange-400 font-black">35</span> total</div>
           <div class="text-slate-500 text-[10px] mt-1">❌ No Beard, Face, Nose</div>
         </div>
         <div class="bg-green-950/40 rounded-xl p-2 border border-green-700/50">
@@ -205,8 +205,8 @@
           <div id="progress-bar-fill" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full transition-all duration-150" style="width: 0%"></div>
         </div>
         <div class="mt-2 flex gap-4 text-[11px] text-slate-400">
-          <span>👽 Alien: <span id="progress-alien" class="text-cyan-400 font-bold">0</span>/12</span>
-          <span>🦍 Ape: <span id="progress-ape" class="text-orange-400 font-bold">0</span>/32</span>
+          <span>👽 Alien: <span id="progress-alien" class="text-cyan-400 font-bold">0</span>/18</span>
+          <span>🦍 Ape: <span id="progress-ape" class="text-orange-400 font-bold">0</span>/35</span>
           <span>🧟 Zombie: <span id="progress-zombie" class="text-green-400 font-bold">0</span>/105</span>
         </div>
       </div>
@@ -385,44 +385,45 @@
   const SECTIONS = ["Background", "Base", "Nose", "Face", "Neck", "Mouth", "Ear", "Beard", "Accessory", "Head", "Eyes"];
 
   // ============================================================
-  // RARITY CONFIG
+  // RARITY CONFIG: প্রতিটি section এর জন্য probability (0 থেকে 1)
   // ============================================================
   const SECTION_RARITY = {
-    "Nose":      0.004,
-    "Face":      0.005,
-    "Neck":      0.002,
-    "Mouth":     0.006,
-    "Ear":       0.01,
-    "Beard":     0.40,
-    "Accessory": 0.004,
-    "Head":      0.92,
-    "Eyes":      0.77,
+    "Nose":      0.004,   // 0.4%
+    "Face":      0.005,   // 0.5%
+    "Neck":      0.002,   // 0.2%
+    "Mouth":     0.006,   // 0.6%
+    "Ear":       0.01,    // 1%
+    "Beard":     0.40,    // 40%
+    "Accessory": 0.004,   // 0.4%
+    "Head":      0.92,    // 92%
+    "Eyes":      0.77,    // 77%
   };
 
   // ============================================================
-  // SPECIAL BASE CONFIG — প্রতিটি ১০,০০০ পর্যন্ত, র্যান্ডম পজিশনে
+  // SPECIAL BASE CONFIG: Alien, Ape, Zombie
   // ============================================================
   const SPECIAL_BASE_CONFIG = {
     "Alien": {
-      maxTotal: 10000,
+      maxTotal: 18,
       blockedSections: ["Beard", "Mouth", "Face", "Nose"],
       label: "👽 Alien",
       color: "cyan"
     },
     "Ape": {
-      maxTotal: 10000,
+      maxTotal: 35,
       blockedSections: ["Beard", "Face", "Nose"],
       label: "🦍 Ape",
       color: "orange"
     },
     "Zombie": {
-      maxTotal: 10000,
-      blockedSections: [],
+      maxTotal: 105,
+      blockedSections: [],   // সব লেয়ার যুক্ত হতে পারবে
       label: "🧟 Zombie",
       color: "green"
     }
   };
 
+  // কোনো base value কি special base কিনা তা চেক করার helper
   function detectSpecialBase(baseValue) {
     if (!baseValue) return null;
     const lower = baseValue.toLowerCase();
@@ -563,6 +564,7 @@
     return counts;
   }
 
+  // Special base গণনা করা
   function getSpecialBaseCounts() {
     let counts = { Alien: 0, Ape: 0, Zombie: 0 };
     nfts.forEach(nft => {
@@ -578,8 +580,7 @@
   }
 
   // ============================================================
-  // CORE BATCH GENERATION ENGINE
-  // Alien / Ape / Zombie — প্রতিটি max 10,000, র্যান্ডম পজিশনে
+  // CORE BATCH GENERATION ENGINE (Rarity + Special Base logic)
   // ============================================================
   async function startSmartAutoGeneration() {
     const countInput = document.getElementById('auto-generation-count');
@@ -607,7 +608,7 @@
     nfts.forEach(nft => { existingDNASet.add(nft.layers.map(l => l.layerId).sort().join('-')); });
 
     let dynamicUsageTrack = getActiveLayerUsageCounts();
-    let specialBaseCounts = getSpecialBaseCounts();
+    let specialBaseCounts = getSpecialBaseCounts(); // existing special base counts
     let successCount = 0; let duplicateSkips = 0;
     
     const offscreenCanvas = document.createElement('canvas'); offscreenCanvas.width = 512; offscreenCanvas.height = 512;
@@ -619,25 +620,23 @@
       while (!isUniqueFound && loopAttempts < 200) {
         loopAttempts++; calculatedBatchLayers = [];
 
-        // --- Background ---
+        // --- Background pick ---
         const bgList = (layersBySection['Background'] || []).filter(item => (dynamicUsageTrack[item.id] || 0) < (parseInt(item.maxCount) || 22000));
         if(!bgList.length) break;
         const randomBg = bgList[Math.floor(Math.random() * bgList.length)];
         calculatedBatchLayers.push({ section: 'Background', value: randomBg.value, imageUrl: randomBg.imageUrl, layerId: randomBg.id, maxCount: randomBg.maxCount || 22000 });
 
-        // --- Base — Alien/Ape/Zombie র্যান্ডমভাবে যেকোনো পজিশনে বসবে ---
+        // --- Base pick ---
         const baseList = (layersBySection['Base'] || []).filter(item => {
           if((dynamicUsageTrack[item.id] || 0) >= (parseInt(item.maxCount) || 22000)) return false;
+          // Special base limit check
           const sp = detectSpecialBase(item.value);
           if(sp && SPECIAL_BASE_CONFIG[sp]) {
-            // এখন limit 10,000 — পূর্ণ হলে ঐ base আর pick হবে না
             if((specialBaseCounts[sp] || 0) >= SPECIAL_BASE_CONFIG[sp].maxTotal) return false;
           }
           return true;
         });
         if(!baseList.length) break;
-
-        // র্যান্ডম shuffle করে base pick — ফলে Alien/Ape/Zombie এলোমেলো পজিশনে পড়বে
         const randomBase = baseList[Math.floor(Math.random() * baseList.length)];
         const targetGender = randomBase.gender || 'male';
         const detectedSpecialBase = detectSpecialBase(randomBase.value);
@@ -645,9 +644,11 @@
 
         calculatedBatchLayers.push({ section: 'Base', value: randomBase.value, imageUrl: randomBase.imageUrl, layerId: randomBase.id, gender: targetGender, maxCount: randomBase.maxCount || 22000, specialBase: detectedSpecialBase });
 
-        // --- বাকি sections — rarity + block logic ---
+        // --- Remaining sections with Rarity + Block logic ---
         for (let j = 2; j < SECTIONS.length; j++) {
           const sectionName = SECTIONS[j];
+
+          // Special base blocked section চেক
           if(blockedSections.includes(sectionName)) continue;
 
           const pool = layersBySection[sectionName] || [];
@@ -658,6 +659,7 @@
 
           if(matchPool.length === 0) continue;
 
+          // Rarity probability দিয়ে সিদ্ধান্ত নাও
           const rarityChance = SECTION_RARITY[sectionName] !== undefined ? SECTION_RARITY[sectionName] : 0.45;
           if(Math.random() < rarityChance) {
             const chosen = matchPool[Math.floor(Math.random() * matchPool.length)];
@@ -692,7 +694,7 @@
           createdAt: Date.now()
         });
 
-        // Special base counter আপডেট
+        // Update special base counter
         if(spBase && specialBaseCounts[spBase] !== undefined) specialBaseCounts[spBase]++;
 
         calculatedBatchLayers.forEach(layer => { dynamicUsageTrack[layer.layerId] = (dynamicUsageTrack[layer.layerId] || 0) + 1; });
@@ -736,6 +738,7 @@
     for(let layer of selectedLayersArray){
        if((usageCounts[layer.layerId] || 0) >= (parseInt(layer.maxCount) || 22000)) { showToast(`❌ Limit Crossed: ${layer.value}`); return; }
     }
+    // Special base limit check for manual mint
     const baseLayer = selectedLayersArray.find(l => l.section === 'Base');
     if(baseLayer) {
       const sp = detectSpecialBase(baseLayer.value);
@@ -744,6 +747,7 @@
         if((currentCounts[sp] || 0) >= SPECIAL_BASE_CONFIG[sp].maxTotal) {
           showToast(`❌ ${SPECIAL_BASE_CONFIG[sp].label} limit (${SPECIAL_BASE_CONFIG[sp].maxTotal}) already reached!`); return;
         }
+        // Blocked sections check
         const blocked = SPECIAL_BASE_CONFIG[sp].blockedSections;
         for(let bl of blocked) {
           if(selectedLayersArray.find(l => l.section === bl)) {
@@ -811,7 +815,7 @@
         layers.forEach(layer => {
           const genLabel = layer.gender === 'female' ? '♀ Female' : '♂ Male';
           const spBase = section === 'Base' ? detectSpecialBase(layer.value) : null;
-          const spBadge = spBase ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">${SPECIAL_BASE_CONFIG[spBase]?.label} · Max ${SPECIAL_BASE_CONFIG[spBase]?.maxTotal.toLocaleString()}</span>` : '';
+          const spBadge = spBase ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">${SPECIAL_BASE_CONFIG[spBase]?.label} · Max ${SPECIAL_BASE_CONFIG[spBase]?.maxTotal}</span>` : '';
           html += `<div class="layer-item p-2 flex flex-col justify-between"><img src="${layer.imageUrl}" class="w-full aspect-square object-contain rounded-lg bg-slate-950"><p class="text-xs font-bold mt-1 truncate">${escapeHtml(layer.value)}</p>
           ${spBadge}
           <div class="text-[10px] text-slate-400 mt-0.5 font-semibold">Gender: ${genLabel}</div>
@@ -843,12 +847,13 @@
           let limitMax = layer.maxCount || 500;
           let isExceeded = countUsed >= limitMax;
 
+          // Special base limit check
           const spBase = section === 'Base' ? detectSpecialBase(layer.value) : null;
           let spExceeded = false; let spBadge = '';
           if(spBase && SPECIAL_BASE_CONFIG[spBase]) {
             const spCounts = getSpecialBaseCounts();
             spExceeded = (spCounts[spBase] || 0) >= SPECIAL_BASE_CONFIG[spBase].maxTotal;
-            spBadge = `<div class="text-[10px] font-bold text-center mt-1 ${spExceeded ? 'text-red-400' : 'text-cyan-400'}">${SPECIAL_BASE_CONFIG[spBase].label} (${spCounts[spBase]||0}/${SPECIAL_BASE_CONFIG[spBase].maxTotal.toLocaleString()})</div>`;
+            spBadge = `<div class="text-[10px] font-bold text-center mt-1 ${spExceeded ? 'text-red-400' : 'text-cyan-400'}">${SPECIAL_BASE_CONFIG[spBase].label} (${spCounts[spBase]||0}/${SPECIAL_BASE_CONFIG[spBase].maxTotal})</div>`;
           }
 
           const fullExceeded = isExceeded || spExceeded;
@@ -955,6 +960,7 @@
       const label = isCryptoPunkMatch ? `<span class="match-badge">⚠️ CryptoPunk Clone Blocked</span>` : `<span class="nomatch-badge">✅ Unique Design</span>`;
       const isChecked = selectedNftIds.has(nft.id) ? 'checked' : '';
 
+      // Special base badge
       const baseLayer = nft.layers ? nft.layers.find(l => l.section === 'Base') : null;
       const spBase = baseLayer ? detectSpecialBase(baseLayer.value) : null;
       const spBadge = spBase ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 ml-1">${SPECIAL_BASE_CONFIG[spBase]?.label}</span>` : '';
@@ -967,7 +973,7 @@
     }).join('');
     
     const spCounts = getSpecialBaseCounts();
-    countDiv.innerHTML = `<div class="flex flex-wrap gap-2 items-center"><span class="bg-indigo-950 text-indigo-300 font-bold px-4 py-1 rounded-full text-sm">Collection: ${nfts.length} Vectors</span><span class="bg-cyan-950 text-cyan-300 font-bold px-3 py-1 rounded-full text-xs">👽 Alien: ${spCounts.Alien}/10,000</span><span class="bg-orange-950 text-orange-300 font-bold px-3 py-1 rounded-full text-xs">🦍 Ape: ${spCounts.Ape}/10,000</span><span class="bg-green-950 text-green-300 font-bold px-3 py-1 rounded-full text-xs">🧟 Zombie: ${spCounts.Zombie}/10,000</span></div>`;
+    countDiv.innerHTML = `<div class="flex flex-wrap gap-2 items-center"><span class="bg-indigo-950 text-indigo-300 font-bold px-4 py-1 rounded-full text-sm">Collection: ${nfts.length} Vectors</span><span class="bg-cyan-950 text-cyan-300 font-bold px-3 py-1 rounded-full text-xs">👽 Alien: ${spCounts.Alien}/18</span><span class="bg-orange-950 text-orange-300 font-bold px-3 py-1 rounded-full text-xs">🦍 Ape: ${spCounts.Ape}/35</span><span class="bg-green-950 text-green-300 font-bold px-3 py-1 rounded-full text-xs">🧟 Zombie: ${spCounts.Zombie}/105</span></div>`;
     if(nfts.length > currentDisplayLimit) loadMoreBtnContainer.classList.remove('hidden'); else loadMoreBtnContainer.classList.add('hidden');
   }
 
@@ -1014,6 +1020,7 @@
 
     const injectorContainer = document.getElementById('edit-global-injector-container'); let html = '';
 
+    // Detect special base to enforce block rules in editor too
     const editorBaseLayer = editingLayersArray.find(l => l.section === 'Base');
     const editorSpBase = editorBaseLayer ? detectSpecialBase(editorBaseLayer.value) : null;
     const editorBlockedSections = editorSpBase ? (SPECIAL_BASE_CONFIG[editorSpBase]?.blockedSections || []) : [];
@@ -1021,6 +1028,7 @@
     for (let section of SECTIONS) {
       if(section === 'Base') continue;
       if(editorBlockedSections.includes(section)) {
+        // Show as blocked
         html += `<div class="bg-red-950/30 border border-red-900/50 rounded-xl p-2 text-xs text-red-400 font-bold text-center">🚫 ${section} — Blocked for ${SPECIAL_BASE_CONFIG[editorSpBase]?.label} base</div>`;
         continue;
       }
@@ -1306,4 +1314,4 @@
   window.onload = function() { loadUserNFTs(); listenToFirebaseLayers(); fetchMasterIndex(); switchTab('layers'); }
 </script>
 </body>
-</html>
+        </html>
